@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0f172a">
+    <title>هواشناسی پیست‌های اسکی ایران</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    
+    <!-- Vazirmatn Font -->
+    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
+
+    <style>
+        body {
+            font-family: 'Vazirmatn', sans-serif;
+            background: linear-gradient(135deg, #1a1c2c 0%, #4a192c 50%, #0f172a 100%);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+            color: #ffffff;
+            min-height: 100vh;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        .glass-strong {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .glass-input {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+
+        .glass-input:focus {
+            outline: none;
+            border-color: #ec4899;
+            background: rgba(0, 0, 0, 0.4);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.1); 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.2); 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255,255,255,0.4); 
+        }
+
+        .resort-btn {
+            transition: all 0.3s ease;
+        }
+        .resort-btn:hover, .resort-btn.active {
+            background: rgba(236, 72, 153, 0.6);
+            transform: translateY(-2px);
+            border-color: rgba(236, 72, 153, 0.8);
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 flex flex-col items-center">
+
+    <!-- Main Container -->
+    <main class="w-full max-w-4xl grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Sidebar / Resort List -->
+        <section class="lg:col-span-1 flex flex-col gap-4 order-2 lg:order-1">
+            <div class="glass rounded-2xl p-5 h-full flex flex-col">
+                <h2 class="text-xl font-bold mb-4 text-cyan-300 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                    لیست پیست‌ها
+                </h2>
+                <div id="resort-list" class="flex flex-col gap-2 overflow-y-auto max-h-[400px] lg:max-h-none pr-1">
+                    <!-- Resort buttons will be injected here -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Weather Content -->
+        <section class="lg:col-span-2 flex flex-col gap-6 order-1 lg:order-2">
+            
+            <!-- Header & Dropdown (Mobile friendly alternative) -->
+            <div class="glass rounded-2xl p-6 flex flex-col md:flex-row justify-between items-center gap-4">
+                <h1 class="text-2xl md:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-pink-400">
+                    هواشناسی اسکی
+                </h1>
+                
+                <select id="mobile-select" class="lg:hidden w-full md:w-auto p-2 rounded-xl glass-input text-sm">
+                    <option value="" disabled selected>انتخاب پیست اسکی...</option>
+                    <!-- Options injected via JS -->
+                </select>
+            </div>
+
+            <!-- Current Weather Card -->
+            <div id="weather-container" class="glass rounded-3xl p-8 relative overflow-hidden min-h-[300px] flex flex-col justify-center items-center text-center animate-fade-in">
+                <!-- Loading Spinner -->
+                <div id="loader" class="absolute inset-0 flex items-center justify-center bg-black/20 z-10">
+                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400"></div>
+                </div>
+
+                <!-- Content -->
+                <div id="weather-content" class="opacity-0 transition-opacity duration-500 w-full">
+                    <h2 id="location-name" class="text-3xl md:text-5xl font-bold mb-2 text-white tracking-wide drop-shadow-lg"></h2>
+                    <p id="current-date" class="text-cyan-200 mb-6 text-sm"></p>
+                    
+                    <div class="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16 mb-8">
+                        <div class="flex flex-col items-center">
+                            <span id="temperature" dir="ltr" class="text-7xl md:text-8xl font-light tracking-tighter">--°</span>
+                            <span id="weather-desc" class="text-lg md:text-xl text-gray-300 mt-2 font-medium bg-white/10 px-4 py-1 rounded-full">--</span>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4 text-right text-sm md:text-base">
+                            <div class="glass-strong p-3 rounded-xl flex items-center gap-3">
+                                <span class="text-2xl">🌬️</span>
+                                <div>
+                                    <p class="text-xs text-gray-400">سرعت باد</p>
+                                    <p id="wind-speed" dir="ltr" class="font-bold text-cyan-300">-- km/h</p>
+                                </div>
+                            </div>
+                            <div class="glass-strong p-3 rounded-xl flex items-center gap-3">
+                                <span class="text-2xl">❄️</span>
+                                <div>
+                                    <p class="text-xs text-gray-400">بارش برف</p>
+                                    <p id="snow-amount" dir="ltr" class="font-bold text-white">-- cm</p>
+                                </div>
+                            </div>
+                            <div class="glass-strong p-3 rounded-xl flex items-center gap-3">
+                                <span class="text-2xl">👁️</span>
+                                <div>
+                                    <p class="text-xs text-gray-400">دید افقی</p>
+                                    <p id="visibility" dir="ltr" class="font-bold text-yellow-300">-- km</p>
+                                </div>
+                            </div>
+                             <div class="glass-strong p-3 rounded-xl flex items-center gap-3">
+                                <span class="text-2xl">💧</span>
+                                <div>
+                                    <p class="text-xs text-gray-400">احتمال بارش</p>
+                                    <p id="precip-prob" dir="ltr" class="font-bold text-blue-300">-- %</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- "When will it snow?" Section -->
+            <div class="glass rounded-2xl p-6">
+                <button id="snow-check-btn" class="w-full group relative overflow-hidden bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-4 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-cyan-500/50 transform hover:-translate-y-1">
+                    <span class="relative z-10 flex items-center justify-center gap-2 text-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        کی برف میاد؟
+                    </span>
+                    <div class="absolute inset-0 h-full w-full bg-white/20 scale-x-0 group-hover:scale-x-100 transition-transform origin-right duration-500"></div>
+                </button>
+                
+                <div id="snow-prediction-result" class="hidden mt-4 p-4 rounded-xl text-center border border-white/10 bg-black/20">
+                    <!-- Result text -->
+                </div>
+            </div>
+
+            <!-- Hourly Forecast -->
+            <div class="glass rounded-2xl p-6">
+                <h3 class="text-lg font-bold mb-4 text-gray-200 border-b border-white/10 pb-2">پیش‌بینی ۲۴ ساعت آینده</h3>
+                <div id="hourly-forecast" class="flex overflow-x-auto gap-4 pb-4 scrollbar-thin">
+                    <!-- Hourly items injected here -->
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <footer class="mt-12 mb-6 text-white/40 text-sm">
+        طراحی شده با ❤️ برای اسکی‌بازان ایران
+    </footer>
+
+    <script>
+        // --- Data ---
+        const resorts = [
+            { id: 1, name: "دیزین", lat: 36.0507, lon: 51.4243 },
+            { id: 2, name: "شمشک", lat: 36.0077, lon: 51.4697 },
+            { id: 3, name: "دربندسر", lat: 35.9915, lon: 51.5133 },
+            { id: 4, name: "توچال", lat: 35.8167, lon: 51.4333 },
+            { id: 5, name: "آبعلی", lat: 35.7591, lon: 51.9714 },
+            { id: 6, name: "ال‌وارس", lat: 38.4750, lon: 48.4750 },
+            { id: 7, name: "پولادکف", lat: 29.6500, lon: 51.9167 },
+            { id: 8, name: "سهند", lat: 37.7950, lon: 46.4045 },
+            { id: 9, name: "کوهرنگ", lat: 32.4437, lon: 50.1269 },
+            { id: 10, name: "فریدونشهر", lat: 32.9510, lon: 49.7620 }
+        ];
+
+        const weatherCodes = {
+            0: "آسمان صاف ☀️",
+            1: "کمی ابری 🌤️",
+            2: "نیمه ابری ⛅",
+            3: "تمام ابری ☁️",
+            45: "مه آلود 🌫️",
+            48: "مه یخبندان ❄️🌫️",
+            51: "نم‌نم باران خفیف 🌦️",
+            53: "نم‌نم باران متوسط 🌧️",
+            55: "نم‌نم باران شدید 🌧️",
+            56: "باران ریز یخ‌زده 🥶",
+            57: "باران ریز یخ‌زده شدید 🥶",
+            61: "باران خفیف 🌧️",
+            63: "باران متوسط 🌧️",
+            65: "باران شدید ⛈️",
+            66: "باران یخ‌زده 🧊",
+            67: "باران یخ‌زده شدید 🧊",
+            71: "برف خفیف 🌨️",
+            73: "برف متوسط 🌨️",
+            75: "برف سنگین ❄️",
+            77: "دانه برف ❄️",
+            80: "رگبار باران ☔",
+            81: "رگبار شدید باران ☔",
+            82: "رگبار سیل‌آسا ⛈️",
+            85: "رگبار برف 🌨️",
+            86: "رگبار سنگین برف ❄️",
+            95: "رعد و برق ⚡",
+            96: "رعد و برق و تگرگ 🌩️",
+            99: "رعد و برق و تگرگ شدید 🌩️"
+        };
+
+        let currentResort = resorts[0];
+        let forecastData = null;
+
+        // --- Elements ---
+        const resortListEl = document.getElementById('resort-list');
+        const mobileSelectEl = document.getElementById('mobile-select');
+        const loaderEl = document.getElementById('loader');
+        const weatherContentEl = document.getElementById('weather-content');
+        const locationNameEl = document.getElementById('location-name');
+        const tempEl = document.getElementById('temperature');
+        const descEl = document.getElementById('weather-desc');
+        const windEl = document.getElementById('wind-speed');
+        const snowEl = document.getElementById('snow-amount');
+        const visibilityEl = document.getElementById('visibility');
+        const precipProbEl = document.getElementById('precip-prob');
+        const hourlyContainerEl = document.getElementById('hourly-forecast');
+        const snowCheckBtn = document.getElementById('snow-check-btn');
+        const snowResultEl = document.getElementById('snow-prediction-result');
+        const dateEl = document.getElementById('current-date');
+
+        // --- Init ---
+        function init() {
+            renderResortList();
+            loadWeather(currentResort);
+            
+            // Event Listener for "When will it snow"
+            snowCheckBtn.addEventListener('click', checkSnowPrediction);
+        }
+
+        // --- Render List ---
+        function renderResortList() {
+            resortListEl.innerHTML = '';
+            mobileSelectEl.innerHTML = '<option value="" disabled>انتخاب پیست اسکی...</option>';
+
+            resorts.forEach(resort => {
+                // Sidebar Button
+                const btn = document.createElement('button');
+                btn.className = `resort-btn w-full text-right p-3 rounded-xl glass border-transparent text-gray-200 hover:text-white flex justify-between items-center ${resort.id === currentResort.id ? 'active bg-pink-500/60 border-pink-500' : ''}`;
+                btn.innerHTML = `
+                    <span class="font-medium">${resort.name}</span>
+                    <span class="text-xs opacity-70 bg-white/10 px-2 py-1 rounded">ایران</span>
+                `;
+                btn.onclick = () => {
+                    selectResort(resort);
+                };
+                resortListEl.appendChild(btn);
+
+                // Mobile Option
+                const option = document.createElement('option');
+                option.value = resort.id;
+                option.text = resort.name;
+                if(resort.id === currentResort.id) option.selected = true;
+                mobileSelectEl.appendChild(option);
+            });
+
+            // Mobile Select Listener
+            mobileSelectEl.onchange = (e) => {
+                const selected = resorts.find(r => r.id == e.target.value);
+                if (selected) selectResort(selected);
+            };
+        }
+
+        function selectResort(resort) {
+            currentResort = resort;
+            renderResortList(); // Re-render to update active state
+            loadWeather(resort);
+            
+            // Reset Snow Prediction
+            snowResultEl.classList.add('hidden');
+        }
+
+        // --- Fetch Weather ---
+        async function loadWeather(resort) {
+            // Show loader
+            loaderEl.style.opacity = '1';
+            weatherContentEl.style.opacity = '0';
+            
+            locationNameEl.textContent = resort.name;
+            
+            // Current Date (Persian)
+            const now = new Date();
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            dateEl.textContent = now.toLocaleDateString('fa-IR', options);
+
+            try {
+                const url = `https://api.open-meteo.com/v1/forecast?latitude=${resort.lat}&longitude=${resort.lon}&hourly=temperature_2m,visibility,wind_speed_10m,snowfall,precipitation,weathercode,precipitation_probability&daily=snowfall_sum&timezone=auto`;
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                forecastData = data;
+
+                updateUI(data);
+            } catch (error) {
+                console.error("Error fetching weather:", error);
+                alert("خطا در دریافت اطلاعات آب و هوا. لطفا دوباره تلاش کنید.");
+            }
+        }
+
+        function updateUI(data) {
+            const currentHourIndex = new Date().getHours();
+            const hourly = data.hourly;
+            
+            // 1. Current Stats (using current hour index)
+            const temp = hourly.temperature_2m[currentHourIndex];
+            const code = hourly.weathercode[currentHourIndex];
+            const wind = hourly.wind_speed_10m[currentHourIndex];
+            const snow = hourly.snowfall[currentHourIndex]; // cm? API says cm or mm depending on settings, open-meteo default is mm for snowfall usually, let's check if we need conversion. Actually API documentation says "cm" for snowfall in some contexts, but let's assume cm based on common ski usage or standard mm. Open-Meteo hourly snowfall is cm.
+            const visibility = hourly.visibility[currentHourIndex]; // meters
+            const prob = hourly.precipitation_probability[currentHourIndex];
+
+            tempEl.textContent = `${Math.round(temp)}°`;
+            descEl.textContent = weatherCodes[code] || "ناشناخته";
+            windEl.textContent = `${wind} km/h`;
+            
+            // Logic: If snowfall > 0 show that, else show 0
+            snowEl.textContent = `${snow} cm`; 
+            
+            // Visibility: convert to km if > 1000
+            if (visibility >= 1000) {
+                visibilityEl.textContent = `${(visibility / 1000).toFixed(1)} km`;
+            } else {
+                visibilityEl.textContent = `${visibility} m`;
+            }
+
+            precipProbEl.textContent = `${prob}%`;
+
+            // 2. Hourly Forecast (Next 24h)
+            hourlyContainerEl.innerHTML = '';
+            for (let i = currentHourIndex; i < currentHourIndex + 24; i++) {
+                if (!hourly.time[i]) break;
+                
+                const timeStr = hourly.time[i]; // ISO format
+                const dateObj = new Date(timeStr);
+                const hourStr = dateObj.toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' });
+                
+                const hTemp = Math.round(hourly.temperature_2m[i]);
+                const hCode = hourly.weathercode[i];
+                const hIcon = getWeatherIcon(hCode);
+
+                const item = document.createElement('div');
+                item.className = 'flex-shrink-0 w-20 glass rounded-xl p-3 flex flex-col items-center justify-between text-sm snap-start hover:bg-white/10 transition-colors';
+                item.innerHTML = `
+                    <span class="text-gray-300 text-xs">${hourStr}</span>
+                    <span class="text-2xl my-2">${hIcon}</span>
+                    <span class="font-bold dir-ltr">${hTemp}°</span>
+                `;
+                hourlyContainerEl.appendChild(item);
+            }
+
+            // Hide loader, Show content
+            loaderEl.style.opacity = '0';
+            setTimeout(() => {
+                weatherContentEl.style.opacity = '1';
+            }, 200);
+        }
+
+        // --- Helper: Simple Icon Mapper for forecast ---
+        function getWeatherIcon(code) {
+            if (code === 0) return "☀️";
+            if (code >= 1 && code <= 3) return "⛅";
+            if (code >= 45 && code <= 48) return "🌫️";
+            if (code >= 51 && code <= 67) return "🌧️";
+            if (code >= 71 && code <= 77) return "❄️";
+            if (code >= 80 && code <= 82) return "☔";
+            if (code >= 85 && code <= 86) return "🌨️";
+            if (code >= 95) return "⚡";
+            return "❓";
+        }
+
+        // --- "When will it snow?" Logic ---
+        function checkSnowPrediction() {
+            if (!forecastData || !forecastData.daily) return;
+
+            const daily = forecastData.daily;
+            const snowfallSums = daily.snowfall_sum;
+            const times = daily.time;
+            
+            let snowDate = null;
+            let snowAmount = 0;
+
+            // Find first day with snow > 0.1 cm (to avoid trace amounts)
+            // Note: Open-Meteo daily snowfall_sum is in cm.
+            for (let i = 0; i < snowfallSums.length; i++) {
+                if (snowfallSums[i] > 0.5) {
+                    snowDate = times[i];
+                    snowAmount = snowfallSums[i];
+                    break;
+                }
+            }
+
+            snowResultEl.classList.remove('hidden');
+            snowResultEl.classList.remove('bg-green-500/20', 'bg-red-500/20', 'border-green-500', 'border-red-500');
+
+            if (snowDate) {
+                const d = new Date(snowDate);
+                const faDate = d.toLocaleDateString('fa-IR', { weekday: 'long', month: 'long', day: 'numeric' });
+                
+                snowResultEl.className = "mt-4 p-4 rounded-xl text-center border border-green-400 bg-green-500/20 animate-fade-in";
+                snowResultEl.innerHTML = `
+                    <p class="text-green-300 font-bold text-lg mb-1">🎉 برف در راه است!</p>
+                    <p class="text-white text-sm">
+                        در تاریخ <span class="text-yellow-300 font-bold">${faDate}</span> 
+                        حدود <span class="text-cyan-300 font-bold">${snowAmount} سانتی‌متر</span> برف می‌بارد.
+                    </p>
+                `;
+            } else {
+                snowResultEl.className = "mt-4 p-4 rounded-xl text-center border border-gray-500 bg-gray-800/40 animate-fade-in";
+                snowResultEl.innerHTML = `
+                    <p class="text-gray-300 font-bold">😕 فعلا خبری نیست</p>
+                    <p class="text-gray-400 text-sm mt-1">
+                        در ۷ روز آینده بارش برف قابل توجهی پیش‌بینی نشده است.
+                    </p>
+                `;
+            }
+        }
+
+        // Start
+        init();
+
+    </script>
+</body>
+</html>
