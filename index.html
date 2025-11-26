@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>کی برف میاد؟ | وضعیت پیست‌های اسکی</title>
-    <meta name="description" content="پیش‌بینی دقیق وضعیت برف و آب‌وهوا برای پیست‌های اسکی ایران">
+    <title>برف کو | دستیار هوشمند اسکی</title>
+    <meta name="description" content="پیش‌بینی و راهنمای کاربردی اسکی‌بازان - تحلیل دقیق باد، دید و برف">
     
     <!-- Fonts: Vazirmatn -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -46,6 +46,9 @@
             --accent: #0ea5e9; /* sky-500 */
             --border: #e0f2fe; /* sky-100 */
             --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --status-go: #dcfce7;
+            --status-caution: #fef3c7;
+            --status-stop: #fee2e2;
         }
 
         .theme-sun {
@@ -109,6 +112,16 @@
         @keyframes fadeIn {
             to { opacity: 1; }
         }
+        
+        /* Status Colors for Text */
+        .text-status-go { color: #15803d; }
+        .text-status-caution { color: #b45309; }
+        .text-status-stop { color: #b91c1c; }
+
+        /* Status Badges */
+        .status-badge-go { background-color: #dcfce7; color: #166534; border: 1px solid #86efac; }
+        .status-badge-caution { background-color: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+        .status-badge-nogo { background-color: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
     </style>
 </head>
 <body class="theme-snow min-h-screen flex flex-col">
@@ -117,11 +130,11 @@
     <header class="w-full px-6 py-6 flex justify-between items-center max-w-6xl mx-auto">
         <div class="flex items-center gap-3">
             <div class="p-2 rounded-xl accent-bg text-white shadow-lg animate-float">
-                <i data-lucide="snowflake" class="w-6 h-6"></i>
+                <i data-lucide="mountain-snow" class="w-7 h-7"></i>
             </div>
             <div>
-                <h1 class="text-2xl font-black tracking-tight">کی برف میاد؟</h1>
-                <p class="text-xs opacity-70 font-medium">پیش‌بینی تخصصی پیست‌های اسکی</p>
+                <h1 class="text-3xl font-black tracking-tight text-blue-900 dark:text-blue-100">برف کو</h1>
+                <p class="text-xs opacity-80 font-bold text-blue-700 dark:text-blue-300">دستیار هوشمند اسکی‌بازان</p>
             </div>
         </div>
 
@@ -131,7 +144,7 @@
                 <i data-lucide="sun" class="w-5 h-5"></i>
             </button>
             <button onclick="setTheme('theme-snow')" class="p-2 rounded-full hover:bg-white/30 transition-colors" aria-label="تم برفی">
-                <i data-lucide="cloud-snow" class="w-5 h-5"></i>
+                <i data-lucide="snowflake" class="w-5 h-5"></i>
             </button>
             <button onclick="setTheme('theme-night')" class="p-2 rounded-full hover:bg-white/30 transition-colors" aria-label="تم شب">
                 <i data-lucide="moon" class="w-5 h-5"></i>
@@ -142,21 +155,19 @@
     <!-- Main Content -->
     <main class="flex-grow px-4 pb-12 max-w-6xl mx-auto w-full relative">
         
-        <!-- Detailed Hourly Modal -->
+        <!-- Modal -->
         <div id="hourly-modal" class="fixed inset-0 z-50 hidden flex-col items-center justify-center bg-black/60 backdrop-blur-sm p-4 fade-in" onclick="closeModal(event)">
-            <div class="glass-card w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl p-6 shadow-2xl relative animate-float-up" onclick="event.stopPropagation()">
-                
-                <button onclick="closeModal()" class="absolute top-4 left-4 p-2 rounded-full hover:bg-black/5 transition-colors">
+            <div class="glass-card w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl p-6 shadow-2xl relative animate-float-up" onclick="event.stopPropagation()">
+                <button onclick="closeModal()" class="absolute top-4 left-4 p-2 rounded-full hover:bg-black/5 transition-colors z-10">
                     <i data-lucide="x" class="w-6 h-6 opacity-60"></i>
                 </button>
-
                 <div id="modal-content" class="flex flex-col gap-6">
                     <!-- Content injected by JS -->
                 </div>
             </div>
         </div>
 
-        <!-- Selector -->
+        <!-- Resort Selector -->
         <div class="flex flex-col items-center my-8 gap-6">
             <div class="glass-card rounded-2xl p-2 flex flex-wrap justify-center gap-2 shadow-sm">
                 <button onclick="loadResort('tochal')" id="btn-tochal" class="resort-btn px-5 py-2 rounded-xl font-bold text-sm transition-all duration-200 bg-transparent opacity-60 hover:opacity-100">
@@ -168,9 +179,12 @@
                 <button onclick="loadResort('darbandsar')" id="btn-darbandsar" class="resort-btn px-5 py-2 rounded-xl font-bold text-sm transition-all duration-200 bg-transparent opacity-60 hover:opacity-100">
                     دربندسر
                 </button>
+                <button onclick="loadResort('shemshak')" id="btn-shemshak" class="resort-btn px-5 py-2 rounded-xl font-bold text-sm transition-all duration-200 bg-transparent opacity-60 hover:opacity-100">
+                    شمشک
+                </button>
             </div>
 
-            <!-- Magic Button (Snowflake Style) -->
+            <!-- Magic Button -->
             <div class="flex flex-col items-center gap-4 w-full">
                 <button onclick="askWhenSnow()" class="group relative flex items-center justify-center w-20 h-20 rounded-full accent-bg text-white shadow-xl hover:shadow-2xl transition-all hover:-translate-y-1 active:translate-y-0 hover:scale-110 z-10 ring-4 ring-white/30">
                     <div class="absolute inset-0 bg-white/20 rounded-full animate-ping opacity-20"></div>
@@ -179,58 +193,105 @@
                 <span class="text-xs font-bold opacity-70 animate-pulse">کی برف میاد؟</span>
             </div>
 
-            <!-- Inline Result Area (No Popups) -->
-            <div id="prediction-result" class="w-full max-w-md hidden fade-in mt-4">
-                <!-- Result injected here -->
-            </div>
+            <!-- Result Area -->
+            <div id="prediction-result" class="w-full max-w-md hidden fade-in mt-4"></div>
         </div>
 
-        <!-- Date Selector Container -->
+        <!-- Date Selector -->
         <div id="date-selector-container" class="w-full max-w-4xl mx-auto mb-8 hidden fade-in">
-            <div class="glass-card p-2 rounded-2xl overflow-x-auto hide-scroll flex gap-2 justify-start md:justify-center" id="date-selector-list">
-                <!-- Dates injected here -->
-            </div>
+            <div class="glass-card p-2 rounded-2xl overflow-x-auto hide-scroll flex gap-2 justify-start md:justify-center" id="date-selector-list"></div>
         </div>
 
-        <!-- Loading State -->
+        <!-- Loading -->
         <div id="loading" class="hidden flex-col items-center justify-center py-20 opacity-50">
             <i data-lucide="loader-2" class="w-10 h-10 animate-spin mb-4"></i>
-            <p class="text-sm animate-pulse">در حال دریافت اطلاعات از ماهواره...</p>
+            <p class="text-sm animate-pulse">در حال تحلیل داده‌های ماهواره‌ای...</p>
         </div>
 
         <!-- Content Container -->
-        <div id="content-area" class="space-y-12">
-            <!-- Dynamic Content Injected Here -->
-        </div>
+        <div id="content-area" class="space-y-12"></div>
 
+        <!-- Guides Section (Separated) -->
+        <section id="guides-section" class="w-full max-w-5xl mx-auto mt-16 pt-12 border-t border-current/10">
+            <div class="flex items-center gap-3 mb-8">
+                <div class="p-2 rounded-lg bg-blue-100 text-blue-700">
+                    <i data-lucide="book-open" class="w-6 h-6"></i>
+                </div>
+                <h2 class="text-2xl font-black">راهنمای هوشمند برف‌کو</h2>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Lens Guide -->
+                <div class="glass-card p-6 rounded-3xl relative overflow-hidden group">
+                    <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-yellow-400 to-orange-500"></div>
+                    <h3 class="font-bold text-lg mb-4 flex items-center gap-2">
+                        <i data-lucide="glasses" class="w-5 h-5 text-orange-500"></i>
+                        راهنمای انتخاب لنز
+                    </h3>
+                    <div class="space-y-4 text-sm opacity-80">
+                        <div class="flex gap-3">
+                            <div class="w-10 h-10 rounded-full bg-yellow-400/20 flex items-center justify-center shrink-0">S1</div>
+                            <div>
+                                <strong class="block text-current">هوای ابری / برفی / مه</strong>
+                                <p class="text-xs opacity-70">نور کم است (Flat Light). شما نیاز به کنتراست بالا دارید. لنزهای <span class="text-pink-600 font-bold">صورتی</span> یا <span class="text-yellow-600 font-bold">زرد</span> باعث می‌شوند پستی بلندی‌های برف دیده شوند.</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-3">
+                            <div class="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center shrink-0">S3</div>
+                            <div>
+                                <strong class="block text-current">آفتابی / نیمه ابری</strong>
+                                <p class="text-xs opacity-70">نور شدید + بازتاب برف = خطر اشعه UV. لنزهای <span class="text-gray-800 font-bold">تیره</span>، <span class="text-orange-700 font-bold">نارنجی</span> یا <span class="text-blue-600 font-bold">آینه‌ای</span> برای محافظت چشم ضروری هستند.</p>
+                            </div>
+                        </div>
+                         <div class="flex gap-3">
+                            <div class="w-10 h-10 rounded-full bg-gray-200/50 flex items-center justify-center shrink-0">S0</div>
+                            <div>
+                                <strong class="block text-current">اسکی شب</strong>
+                                <p class="text-xs opacity-70">فقط لنز <span class="font-bold">شفاف (Clear)</span> یا زرد خیلی روشن. لنز تیره در شب خطرناک است.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Wind Guide -->
+                <div class="glass-card p-6 rounded-3xl relative overflow-hidden group">
+                    <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-400 to-purple-600"></div>
+                    <h3 class="font-bold text-lg mb-4 flex items-center gap-2">
+                        <i data-lucide="wind" class="w-5 h-5 text-blue-500"></i>
+                        تاثیر باد بر اسکی
+                    </h3>
+                    <div class="space-y-4 text-sm opacity-80">
+                        <div class="flex items-start gap-3">
+                            <i data-lucide="check-circle-2" class="w-5 h-5 text-green-600 shrink-0 mt-0.5"></i>
+                            <div>
+                                <strong class="block text-green-700">زیر ۲۰ کیلومتر/ساعت</strong>
+                                <p class="text-xs opacity-70">شرایط ایده‌آل. برف کوبیده شده خوب می‌ماند و سردتان نمی‌شود.</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <i data-lucide="alert-triangle" class="w-5 h-5 text-orange-600 shrink-0 mt-0.5"></i>
+                            <div>
+                                <strong class="block text-orange-700">۳۰ تا ۵۰ کیلومتر/ساعت</strong>
+                                <p class="text-xs opacity-70">باد مخالف حرکت شما را کند می‌کند. سرمای حسی (Wind Chill) زیاد است. لباس بادگیر بپوشید.</p>
+                            </div>
+                        </div>
+                         <div class="flex items-start gap-3">
+                            <i data-lucide="x-octagon" class="w-5 h-5 text-red-600 shrink-0 mt-0.5"></i>
+                            <div>
+                                <strong class="block text-red-700">بالای ۶۰ کیلومتر/ساعت</strong>
+                                <p class="text-xs opacity-70">احتمال بسته شدن تله‌کابین و تله‌سیژ. تعادل بهم می‌خورد. اسکی نکنید.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
     </main>
-
-    <!-- Info Section (Sources) -->
-    <section class="w-full max-w-6xl mx-auto px-6 py-8 border-t border-current/10 mt-8">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 text-xs opacity-70 leading-relaxed">
-            <div>
-                <h4 class="font-bold text-sm mb-2 opacity-100 flex items-center gap-2"><i data-lucide="info" class="w-3 h-3"></i> وضعیت پیست و تله‌کابین</h4>
-                <p>برای اطلاع از باز بودن پیست‌ها، بهترین منبع <strong>اینستاگرام رسمی</strong> هر پیست یا تماس تلفنی صبحگاهی است. این سایت فقط داده‌های هواشناسی را نمایش می‌دهد.</p>
-            </div>
-            <div>
-                <h4 class="font-bold text-sm mb-2 opacity-100 flex items-center gap-2"><i data-lucide="alert-triangle" class="w-3 h-3"></i> هشدار ایمنی</h4>
-                <p>در بادهای بالای ۳۰ کیلومتر/ساعت و دید کم، احتمال بسته شدن تله‌کابین وجود دارد. همیشه پیش از حرکت، وضعیت جاده‌های کوهستانی (چالوس/شمشک) را از پلیس راه (۱۴۱) چک کنید.</p>
-            </div>
-            <div>
-                <h4 class="font-bold text-sm mb-2 opacity-100 flex items-center gap-2"><i data-lucide="database" class="w-3 h-3"></i> منابع داده</h4>
-                <ul class="list-disc list-inside space-y-1">
-                    <li>هواشناسی: Open-Meteo (ECMWF High Res)</li>
-                    <li>تحلیل برف: بر اساس مدل‌های ماهواره‌ای</li>
-                    <li>توسعه: برای جامعه اسکی ایران</li>
-                </ul>
-            </div>
-        </div>
-    </section>
 
     <!-- Footer -->
     <footer class="w-full py-6 px-6 text-center text-xs opacity-50 border-t border-current/5 mt-auto">
         <div class="max-w-4xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-            <p>© ۱۴۰۳ - کی برف میاد؟</p>
+            <p>© ۱۴۰۳ - برف کو</p>
             <a href="https://github.com/emadewij-collab/snowf" target="_blank" class="flex items-center gap-2 hover:opacity-100 transition-opacity">
                 <i data-lucide="github" class="w-3 h-3"></i>
                 <span>emadewij-collab/snowf</span>
@@ -249,7 +310,7 @@
                 locations: [
                     { name: 'ایستگاه ۷ (قله)', alt: '3740m', lat: 35.8853, lon: 51.4150 },
                     { name: 'ایستگاه ۵ (دامنه)', alt: '2935m', lat: 35.8600, lon: 51.4080 },
-                    { name: 'ایستگاه ۱ (پای کوه)', alt: '1900m', lat: 35.8195, lon: 51.4100 }
+                    { name: 'ایستگاه ۱ (پایین)', alt: '1900m', lat: 35.8195, lon: 51.4100 }
                 ]
             },
             dizin: {
@@ -269,14 +330,211 @@
                     { name: 'میان‌راه', alt: '3000m', lat: 36.0150, lon: 51.4600 },
                     { name: 'پایین', alt: '2600m', lat: 36.0100, lon: 51.4550 }
                 ]
+            },
+            shemshak: {
+                id: 'shemshak',
+                name: 'پیست اسکی شمشک',
+                locations: [
+                    { name: 'قله', alt: '3050m', lat: 36.0220, lon: 51.4890 },
+                    { name: 'آفتاب (میانی)', alt: '2550m', lat: 36.0150, lon: 51.4950 },
+                    { name: 'شب (پایین)', alt: '2550m', lat: 36.0100, lon: 51.4900 }
+                ]
             }
         };
 
         const weatherStore = {};
-        let currentSelection = 'tochal'; // Default Resort
-        let selectedDayIndex = 0; // Default Date (0 = Today)
+        let currentSelection = 'tochal'; 
+        let selectedDayIndex = 0; 
 
-        // WMO Weather Codes
+        // --- Advanced Analytics Logic ---
+
+        function calculateWindChill(temp, speed) {
+            if (speed < 4.8 || temp > 10) return temp;
+            return Math.round(13.12 + 0.6215 * temp - 11.37 * Math.pow(speed, 0.16) + 0.3965 * temp * Math.pow(speed, 0.16));
+        }
+
+        function analyzeSkiConditions(data) {
+            const gust = data.gust || data.wind * 1.5; 
+            const wind = data.wind;
+            const vis = data.visibility || 10000; 
+            const cape = data.cape || 0;
+            const cloud = data.cloud;
+            const temp = data.temp;
+            const snowRate = data.snowRate || 0;
+            const isDay = data.isDay;
+            
+            let decision = "شرایط مساعد";
+            let statusClass = "status-badge-go";
+            let icon = "check-circle-2";
+            
+            // --- 1. Decision Logic (Persian) ---
+            let reasons = [];
+            
+            if (gust >= 60) {
+                decision = "خطرناک / ممنوع";
+                reasons.push(`باد لحظه‌ای شدید (${gust} km/h)`);
+                statusClass = "status-badge-nogo";
+                icon = "x-octagon";
+            } else if (vis < 200) {
+                decision = "خطرناک / ممنوع";
+                reasons.push(`دید افقی بسیار کم (${vis}m)`);
+                statusClass = "status-badge-nogo";
+                icon = "eye-off";
+            } else if (cape >= 1000) {
+                decision = "خطرناک (صاعقه)";
+                reasons.push(`ناپایداری جوی بالا`);
+                statusClass = "status-badge-nogo";
+                icon = "zap";
+            } else if (gust > 40 || vis < 800 || (snowRate > 2)) {
+                decision = "احتیاط کنید";
+                if(gust > 40) reasons.push(`باد قابل توجه (${gust} km/h)`);
+                if(vis < 800) reasons.push(`کاهش دید (${vis}m)`);
+                if(snowRate > 2) reasons.push(`بارش سنگین برف`);
+                statusClass = "status-badge-caution";
+                icon = "alert-triangle";
+            }
+
+            // --- 2. Suggestion Strings (Logic: Condition -> Recommendation) ---
+            
+            // Lens
+            let lensRec = "";
+            let uvCondition = "";
+            if (isDay === 0) {
+                uvCondition = "شب / تاریک";
+                lensRec = "لنز شفاف (Clear) یا زرد روشن";
+            } else if (vis < 800 || cloud > 90 || snowRate > 0) {
+                uvCondition = "نور تخت (Flat Light)";
+                lensRec = "لنز صورتی یا زرد (افزایش کنتراست)";
+            } else if (cloud < 30) {
+                uvCondition = "آفتاب شدید + بازتاب برف";
+                lensRec = "لنز تیره، آینه‌ای یا دودی";
+            } else {
+                uvCondition = "نیمه ابری";
+                lensRec = "لنز نارنجی یا فتوکرومیک";
+            }
+
+            // Wind
+            let windRec = "";
+            let windCond = "";
+            if (wind < 10) {
+                windCond = "باد آرام";
+                windRec = "شرایط عالی برای اسکی";
+            } else if (wind < 30) {
+                windCond = "نسیم ملایم";
+                windRec = "تاثیر کمی روی تعادل دارد";
+            } else if (wind < 50) {
+                windCond = "باد متوسط";
+                windRec = "احساس سرما (Wind Chill) + کاهش تعادل";
+            } else {
+                windCond = "باد شدید/طوفانی";
+                windRec = "خطرناک، احتمال توقف تله‌کابین";
+            }
+
+            // Checklist Generation (HTML)
+            const checklistHTML = `
+                <div style="font-family: 'Vazirmatn', sans-serif; direction: rtl; text-align: right; padding: 20px; border: 2px solid #000;">
+                    <h1 style="text-align: center; margin-bottom: 5px;">چک‌لیست ایمنی اسکی - برف‌کو</h1>
+                    <p style="text-align: center; font-size: 12px; color: #555;">تاریخ: ${new Date().toLocaleDateString('fa-IR')}</p>
+                    <div style="border-bottom: 1px dashed #000; margin: 10px 0;"></div>
+                    
+                    <div style="background: #eee; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
+                        <strong>وضعیت: ${decision}</strong><br/>
+                        <small>علت: ${reasons.length ? reasons.join('، ') : 'پایدار'}</small>
+                    </div>
+
+                    <h3 style="font-size: 14px; border-bottom: 2px solid #000; display: inline-block;">۱. تجهیزات ضروری</h3>
+                    <ul style="list-style: none; padding: 0;">
+                        <li style="margin: 5px 0;">▢ کلاه ایمنی (Helmet) <small>- ${wind > 30 ? 'حتما بررسی شود (باد زیاد)' : 'الزامی'}</small></li>
+                        <li style="margin: 5px 0;">▢ عینک اسکی <small>- پیشنهاد: ${lensRec}</small></li>
+                        <li style="margin: 5px 0;">▢ ضدآفتاب ${isDay && cloud < 50 ? '(ضروری: آفتاب)' : ''}</li>
+                        <li style="margin: 5px 0;">▢ لباس لایه‌ای ${temp < -5 ? '(بسیار سرد: ۳ لایه)' : ''}</li>
+                    </ul>
+
+                    <div style="margin-top: 20px; font-size: 11px; text-align: center;">
+                        ایمنی شما در اولویت است. همیشه پیش از خروج شماره امداد پیست را ذخیره کنید.
+                    </div>
+                </div>
+            `;
+
+            return {
+                decision,
+                reasons,
+                statusClass,
+                icon,
+                checklistHTML,
+                windChill: calculateWindChill(temp, wind),
+                logic: {
+                    lens: { condition: uvCondition, rec: lensRec },
+                    wind: { condition: windCond, rec: windRec }
+                }
+            };
+        }
+
+        function printChecklist(htmlContent) {
+            const printWindow = window.open('', '', 'height=600,width=400');
+            printWindow.document.write('<html><head><title>Checklist</title>');
+            printWindow.document.write('<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700&display=swap" rel="stylesheet">');
+            printWindow.document.write('</head><body>');
+            printWindow.document.write(htmlContent);
+            printWindow.document.write('</body></html>');
+            printWindow.document.close();
+            printWindow.focus();
+            setTimeout(() => { printWindow.print(); }, 1000);
+        }
+
+        // --- API & Rendering ---
+
+        function getPersianWeekday(dateObj) {
+            const days = ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه'];
+            return days[dateObj.getDay()];
+        }
+
+        function getPersianDateString(offset = 0) {
+            const d = new Date();
+            d.setDate(d.getDate() + offset);
+            return {
+                weekday: getPersianWeekday(d),
+                fullDate: new Intl.DateTimeFormat('fa-IR', { day: 'numeric', month: 'long' }).format(d),
+                iso: d.toISOString().split('T')[0]
+            };
+        }
+
+        async function fetchWeatherData(lat, lon) {
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,is_day,snow_depth,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,snowfall_sum,precipitation_probability_max,wind_speed_10m_max&hourly=temperature_2m,weather_code,wind_speed_10m,wind_gusts_10m,is_day,relative_humidity_2m,cloud_cover,visibility,cape,snowfall,wind_direction_10m&forecast_days=7&timezone=Asia%2FTehran`;
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Network response was not ok');
+                return await response.json();
+            } catch (error) {
+                console.error("Error fetching weather:", error);
+                return null;
+            }
+        }
+
+        function renderDateSelector() {
+            const container = document.getElementById('date-selector-list');
+            container.innerHTML = '';
+            for(let i=0; i<7; i++) { 
+                const dateInfo = getPersianDateString(i);
+                const isSelected = i === selectedDayIndex;
+                const btn = document.createElement('button');
+                btn.onclick = () => selectDate(i);
+                btn.className = `flex flex-col items-center justify-center px-4 py-2 rounded-xl min-w-[80px] transition-all ${isSelected ? 'accent-bg text-white shadow-md scale-105' : 'bg-transparent opacity-60 hover:opacity-100 hover:bg-white/10'}`;
+                btn.innerHTML = `
+                    <span class="text-sm font-bold mb-1">${i === 0 ? 'امروز' : dateInfo.weekday}</span>
+                    <span class="text-xs font-mono opacity-80">${dateInfo.fullDate}</span>
+                `;
+                container.appendChild(btn);
+            }
+            document.getElementById('date-selector-container').classList.remove('hidden');
+        }
+
+        function selectDate(index) {
+            selectedDayIndex = index;
+            renderDateSelector(); 
+            renderResortCards(currentSelection);
+        }
+
         function getWeatherStatus(code) {
             const map = {
                 0: { text: 'آسمان صاف', icon: 'sun' },
@@ -304,299 +562,132 @@
             return map[code] || { text: 'نامشخص', icon: 'help-circle' };
         }
 
-        // Wind Guide Logic (Updated)
-        function getWindStatus(speed) {
-            if (speed <= 10) return { label: 'خیلی راحت', icon: 'check', desc: 'باد تقریباً هیچ تأثیری ندارد؛ کنترل کامل دارید.', color: 'text-green-600', bg: 'bg-green-500/10' };
-            if (speed <= 20) return { label: 'راحت', icon: 'smile', desc: 'کمی احساس باد می‌کنید؛ تأثیر کم روی تعادل.', color: 'text-emerald-600', bg: 'bg-emerald-500/10' };
-            if (speed <= 30) return { label: 'چالش‌دار', icon: 'alert-triangle', desc: 'باد قابل توجه؛ کنترل سرعت سخت‌تر می‌شود.', color: 'text-yellow-600', bg: 'bg-yellow-500/10' };
-            if (speed <= 40) return { label: 'سخت', icon: 'zap', desc: 'باد شدید؛ تعادل سخت، احتمال حرکت جانبی.', color: 'text-orange-600', bg: 'bg-orange-500/10' };
-            if (speed <= 50) return { label: 'خطرناک', icon: 'x', desc: 'تقریباً غیرقابل کنترل؛ احتمال بسته شدن پیست.', color: 'text-red-600', bg: 'bg-red-500/10' };
-            return { label: 'ممنوع', icon: 'ban', desc: 'خیلی خطرناک؛ فقط حرفه‌ای‌ها با تجهیزات خاص.', color: 'text-red-800', bg: 'bg-red-900/10' };
-        }
-
-        // Goggles Recommendation Logic (Updated based on new table)
-        function getGoggleInfo(weatherCode, isDay) {
-            // Condition 1: Low / Cloudy (Dense Clouds)
-            // Includes: Night, Overcast (3), Fog (45,48), Rain/Snow (51+)
-            if (isDay === 0 || weatherCode >= 3) {
-                return {
-                    condition: 'کم / ابری',
-                    effect: 'راحت / دید خوب 🙂',
-                    tips: 'عینک اسکی با شیشه روشن؛ انعکاس نور کم، دید واضح است.',
-                    vlt: '60–90%',
-                    bg: 'bg-gray-500/10',
-                    textColor: 'text-gray-600',
-                    icon: isDay === 0 ? 'moon' : 'cloud'
-                };
-            }
-
-            // Condition 2: Medium / Scattered Sun
-            // Includes: Partly Cloudy (2)
-            if (weatherCode === 2) {
-                return {
-                    condition: 'متوسط / آفتاب پراکنده',
-                    effect: 'متوسط – نیاز به توجه ⚠️',
-                    tips: 'عینک با شیشه نیمه تیره (Category 2) مناسب؛ کمی انعکاس روی برف است.',
-                    vlt: '30–60%',
-                    bg: 'bg-yellow-500/10',
-                    textColor: 'text-yellow-700',
-                    icon: 'cloud-sun'
-                };
-            }
-
-            // Condition 3: High / Bright Sun
-            // Includes: Mainly Clear (1)
-            if (weatherCode === 1) {
-                return {
-                    condition: 'زیاد / آفتاب روشن',
-                    effect: 'چالش‌دار ⚡',
-                    fullEffect: 'چالش‌دار / احتمال خستگی چشم ⚡',
-                    tips: 'عینک تیره (Category 3) با فیلتر UV؛ ضد بخار و فیت مناسب.',
-                    vlt: '10–30%',
-                    bg: 'bg-orange-500/10',
-                    textColor: 'text-orange-700',
-                    icon: 'sun'
-                };
-            }
-
-            // Condition 4: Very High / Shiny Snow
-            // Includes: Clear Sky (0)
-            if (weatherCode === 0) {
-                return {
-                    condition: 'خیلی زیاد / برف براق',
-                    effect: 'خطرناک / خیرگی شدید ❌',
-                    fullEffect: 'خطرناک / خیرگی شدید ❌',
-                    tips: 'عینک بسیار تیره یا آینه‌ای (mirror) با فیلتر UV؛ توقف در صورت خستگی چشم.',
-                    vlt: '5–10%',
-                    bg: 'bg-red-500/10',
-                    textColor: 'text-red-700',
-                    icon: 'glasses'
-                };
-            }
-
-            // Fallback
-            return {
-                condition: 'نامشخص',
-                effect: 'معمولی',
-                tips: 'عینک استاندارد با محافظ UV استفاده کنید.',
-                vlt: '---',
-                bg: 'bg-gray-200',
-                textColor: 'text-gray-500',
-                icon: 'help-circle'
-            };
-        }
-
-        // --- Logic Functions ---
-
-        function setTheme(themeName) {
-            document.body.className = `${themeName} min-h-screen flex flex-col`;
-        }
-
-        function getPersianWeekday(dateObj) {
-            const days = ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه'];
-            return days[dateObj.getDay()];
-        }
-
-        function getPersianDateString(offset = 0) {
-            const d = new Date();
-            d.setDate(d.getDate() + offset);
-            const options = { month: 'long', day: 'numeric' };
-            // Using a simple mock if Intl not fully supported or just simple formatting
-            // But let's try to get day number and month map for lightweight solution
-            const day = d.getDate();
-            // Note: Native JS Intl might produce '۱۴ نوامبر', we want '۲۴ آبان'.
-            // For this demo, I will stick to simple Weekday Name as primary, and just show date number if possible.
-            // Or better: Use Intl with 'fa-IR'
-            return {
-                weekday: getPersianWeekday(d),
-                fullDate: new Intl.DateTimeFormat('fa-IR', { day: 'numeric', month: 'long' }).format(d),
-                iso: d.toISOString().split('T')[0]
-            };
-        }
-
-        async function fetchWeatherData(lat, lon) {
-            // Added hourly for breakdown with more details for modal
-            const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,is_day,precipitation,rain,snowfall,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,snowfall_sum,precipitation_probability_max&hourly=temperature_2m,weather_code,wind_speed_10m,is_day,relative_humidity_2m,cloud_cover,precipitation,snowfall,wind_direction_10m&forecast_days=16&timezone=Asia%2FTehran`;
-            try {
-                const response = await fetch(url);
-                if (!response.ok) throw new Error('Network response was not ok');
-                return await response.json();
-            } catch (error) {
-                console.error("Error fetching weather:", error);
-                return null;
-            }
-        }
-
-        function renderDateSelector() {
-            const container = document.getElementById('date-selector-list');
-            container.innerHTML = '';
-            
-            for(let i=0; i<7; i++) { // Show 7 days
-                const dateInfo = getPersianDateString(i);
-                const isSelected = i === selectedDayIndex;
-                
-                const btn = document.createElement('button');
-                btn.onclick = () => selectDate(i);
-                btn.className = `flex flex-col items-center justify-center px-4 py-2 rounded-xl min-w-[80px] transition-all ${isSelected ? 'accent-bg text-white shadow-md scale-105' : 'bg-transparent opacity-60 hover:opacity-100 hover:bg-white/10'}`;
-                btn.innerHTML = `
-                    <span class="text-sm font-bold mb-1">${i === 0 ? 'امروز' : dateInfo.weekday}</span>
-                    <span class="text-xs font-mono opacity-80">${dateInfo.fullDate}</span>
-                `;
-                container.appendChild(btn);
-            }
-            document.getElementById('date-selector-container').classList.remove('hidden');
-        }
-
-        function selectDate(index) {
-            selectedDayIndex = index;
-            renderDateSelector(); // Update active state
-            // Re-render cards with new date (using cached data)
-            renderResortCards(currentSelection);
-        }
-
         function createCardHTML(locationName, alt, data, dayIndex, resortKey, locIndex) {
             if (!data) return `<div class="glass-card p-6 rounded-2xl text-center">خطا در دریافت اطلاعات</div>`;
 
             const daily = data.daily;
             const hourly = data.hourly;
+            const currentHour = new Date().getHours();
             
-            // Determine "Main" temp to show
-            // If Today (dayIndex 0): Show Current Temp
-            // If Future: Show Max Temp
-            let mainTemp, mainLabel;
-            if (dayIndex === 0) {
-                mainTemp = Math.round(data.current.temperature_2m);
-                mainLabel = 'دمای فعلی';
-            } else {
-                mainTemp = Math.round(daily.temperature_2m_max[dayIndex]);
-                mainLabel = 'دمای بیشینه';
-            }
-            
+            // Temps
+            const isToday = dayIndex === 0;
+            let mainTemp = isToday ? Math.round(data.current.temperature_2m) : Math.round(daily.temperature_2m_max[dayIndex]);
+            const minTemp = Math.round(daily.temperature_2m_min[dayIndex]);
+            const maxTemp = Math.round(daily.temperature_2m_max[dayIndex]);
+
+            // Weather
             const weatherCode = daily.weather_code[dayIndex];
             const weather = getWeatherStatus(weatherCode);
             
-            // Hourly Breakdown for specific Day
-            // Hours: 9, 12, 15, 20
-            const targetHours = [9, 12, 15, 20];
-            const timeLabels = ['صبح (۹)', 'ظهر (۱۲)', 'عصر (۱۵)', 'شب (۲۰)'];
+            // Sample Hour (Noon) for Analysis
+            const sampleHourIndex = (dayIndex * 24) + 12;
+            const analysisData = {
+                temp: hourly.temperature_2m[sampleHourIndex] || mainTemp,
+                wind: hourly.wind_speed_10m[sampleHourIndex] || 0,
+                gust: hourly.wind_gusts_10m ? hourly.wind_gusts_10m[sampleHourIndex] : 0,
+                visibility: hourly.visibility ? hourly.visibility[sampleHourIndex] : 10000,
+                cape: hourly.cape ? hourly.cape[sampleHourIndex] : 0,
+                cloud: hourly.cloud_cover[sampleHourIndex] || 0,
+                snowRate: hourly.snowfall[sampleHourIndex] || 0,
+                isDay: 1
+            };
             
+            const analysis = analyzeSkiConditions(analysisData);
+
+            // Grid
+            const targetHours = [9, 12, 15];
+            const timeLabels = ['صبح', 'ظهر', 'عصر'];
             let gridHTML = '';
-            
             targetHours.forEach((hour, idx) => {
-                const hourlyIndex = (dayIndex * 24) + hour;
+                const hIdx = (dayIndex * 24) + hour;
+                if (hIdx >= hourly.time.length) return;
+                const tTemp = Math.round(hourly.temperature_2m[hIdx]);
+                const tCode = hourly.weather_code[hIdx];
+                const tIcon = getWeatherStatus(tCode).icon;
                 
-                // Check if index exists
-                if (hourlyIndex >= hourly.time.length) return;
-
-                const tTemp = Math.round(hourly.temperature_2m[hourlyIndex]);
-                const tWind = Math.round(hourly.wind_speed_10m[hourlyIndex]);
-                const tCode = hourly.weather_code[hourlyIndex];
-                const tIsDay = hourly.is_day[hourlyIndex];
-                
-                const tGoggle = getGoggleInfo(tCode, tIsDay);
-                const tWindStatus = getWindStatus(tWind);
-                
-                // Build column
                 gridHTML += `
-                    <button onclick="openHourlyDetails('${resortKey}', ${locIndex}, ${hourlyIndex}, '${timeLabels[idx]}')" class="flex flex-col gap-2 items-center p-2 bg-white/40 rounded-xl border border-current/5 min-h-[160px] shadow-sm hover:bg-white/60 hover:scale-105 transition-all cursor-pointer text-center">
-                        <span class="text-xs font-bold opacity-60 border-b border-current/10 pb-1 w-full text-center">${timeLabels[idx]}</span>
-                        
-                        <!-- Temp -->
-                        <div class="flex items-center justify-center w-full my-1">
-                             <span class="text-xl font-black dir-ltr ${tTemp < 0 ? 'text-blue-600' : 'text-orange-600'}">${tTemp}°</span>
-                        </div>
-
-                        <!-- Wind -->
-                        <div class="flex flex-col items-center w-full bg-white/60 rounded p-1.5 mb-1 shadow-inner">
-                            <div class="flex items-center gap-1">
-                                <span class="text-xs font-bold dir-ltr ${tWindStatus.color}">${tWind}</span>
-                                <span class="text-[10px] opacity-60">km</span>
-                            </div>
-                            <span class="text-[9px] font-bold ${tWindStatus.color} text-center leading-tight">${tWindStatus.label}</span>
-                        </div>
-
-                        <!-- Goggle -->
-                         <div class="flex flex-col items-center w-full mt-auto pt-1 border-t border-current/5">
-                            <i data-lucide="${tGoggle.icon}" class="w-4 h-4 mb-1 ${tGoggle.textColor}"></i>
-                            <span class="text-[9px] font-bold text-center leading-tight opacity-90 truncate w-full px-1">${tGoggle.condition}</span>
-                            <span class="text-[9px] opacity-60 dir-ltr font-mono">${tGoggle.vlt}</span>
-                        </div>
+                    <button onclick="openHourlyDetails('${resortKey}', ${locIndex}, ${hIdx}, '${timeLabels[idx]}')" class="flex flex-col justify-center items-center p-2 bg-white/30 rounded-xl border border-current/5 shadow-sm hover:bg-white/50 transition-all">
+                        <span class="text-[10px] font-bold opacity-60 mb-1">${timeLabels[idx]}</span>
+                        <i data-lucide="${tIcon}" class="w-5 h-5 my-1 opacity-80"></i>
+                        <span class="text-lg font-black dir-ltr ${tTemp < 0 ? 'text-blue-600' : 'text-orange-600'}">${tTemp}°</span>
                     </button>
                 `;
             });
 
-            const dateInfo = getPersianDateString(dayIndex);
-
             return `
-                <div class="glass-card p-5 rounded-3xl flex flex-col gap-4 fade-in relative overflow-hidden">
+                <div class="glass-card p-0 rounded-[2rem] flex flex-col relative overflow-hidden group transition-all duration-300 hover:shadow-xl h-full">
                     
-                    <!-- Header -->
-                    <div class="flex justify-between items-start border-b border-current/10 pb-3">
-                        <div>
-                            <h3 class="font-bold text-xl">${locationName}</h3>
-                            <span class="text-xs font-mono opacity-60 bg-current/5 px-2 py-0.5 rounded">${alt}</span>
+                    <!-- Header Status Strip -->
+                    <div class="${analysis.statusClass} p-4 pb-8 flex justify-between items-start relative z-0">
+                        <div class="z-10">
+                            <h3 class="font-black text-xl tracking-tight">${locationName}</h3>
+                            <span class="text-[10px] font-bold uppercase tracking-wider opacity-60 bg-white/30 px-2 py-0.5 rounded-full dir-ltr">${alt}</span>
                         </div>
-                        <div class="flex flex-col items-end">
-                             <span class="text-[10px] font-bold opacity-50 mb-1">${dateInfo.weekday}</span>
-                            <div class="flex items-center gap-1.5">
-                                <span class="text-xs font-bold opacity-80">${weather.text}</span>
-                                <i data-lucide="${weather.icon}" class="w-6 h-6 accent-text"></i>
+                        <div class="flex items-center gap-1 z-10 bg-white/50 px-3 py-1 rounded-xl shadow-sm">
+                            <i data-lucide="${analysis.icon}" class="w-4 h-4"></i>
+                            <span class="text-xs font-black">${analysis.decision}</span>
+                        </div>
+                    </div>
+
+                    <!-- Main Stats (Overlapping Header) -->
+                    <div class="px-6 -mt-6 relative z-10 flex justify-between items-end">
+                        <div class="glass-card bg-white p-3 rounded-2xl shadow-md flex flex-col items-center min-w-[80px]">
+                            <span class="text-4xl font-black dir-ltr text-current leading-none">${mainTemp}°</span>
+                            <div class="flex gap-2 mt-1 text-[10px] font-bold opacity-50 dir-ltr">
+                                <span>L:${minTemp}</span>
+                                <span>H:${maxTemp}</span>
+                            </div>
+                        </div>
+                         <div class="flex flex-col items-end mb-2">
+                            <i data-lucide="${weather.icon}" class="w-10 h-10 accent-text animate-float"></i>
+                            <span class="text-xs font-bold opacity-80">${weather.text}</span>
+                        </div>
+                    </div>
+
+                    <!-- Smart Reasoning (The "Why") -->
+                    <div class="p-4 space-y-2">
+                        <!-- Wind Logic -->
+                        <div onclick="openHourlyDetails('${resortKey}', ${locIndex}, ${sampleHourIndex}, 'ظهر')" class="cursor-pointer bg-blue-50/50 border border-blue-100 p-3 rounded-xl flex items-start gap-3 hover:bg-blue-50 transition-colors">
+                            <div class="mt-0.5 p-1.5 bg-blue-100 text-blue-600 rounded-lg">
+                                <i data-lucide="wind" class="w-4 h-4"></i>
+                            </div>
+                            <div class="flex flex-col">
+                                <span class="text-[10px] font-bold text-blue-800 opacity-70 mb-0.5">وضعیت باد: ${analysisData.wind} km/h</span>
+                                <span class="text-xs font-black text-blue-900 leading-tight">${analysis.logic.wind.condition} ← <span class="font-normal opacity-80">${analysis.logic.wind.rec}</span></span>
+                            </div>
+                        </div>
+
+                        <!-- Lens Logic -->
+                        <div onclick="openHourlyDetails('${resortKey}', ${locIndex}, ${sampleHourIndex}, 'ظهر')" class="cursor-pointer bg-orange-50/50 border border-orange-100 p-3 rounded-xl flex items-start gap-3 hover:bg-orange-50 transition-colors">
+                            <div class="mt-0.5 p-1.5 bg-orange-100 text-orange-600 rounded-lg">
+                                <i data-lucide="glasses" class="w-4 h-4"></i>
+                            </div>
+                            <div class="flex flex-col">
+                                <span class="text-[10px] font-bold text-orange-800 opacity-70 mb-0.5">وضعیت نور: ${analysis.logic.lens.condition}</span>
+                                <span class="text-xs font-black text-orange-900 leading-tight">پیشنهاد ← <span class="font-normal opacity-80">${analysis.logic.lens.rec}</span></span>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Main Temps -->
-                    <div class="flex items-end justify-between px-4 py-2">
-                        <!-- Min -->
-                        <div class="flex flex-col items-center text-blue-500">
-                            <span class="text-[10px] opacity-70 mb-1">کمینه</span>
-                            <span class="text-xl font-bold dir-ltr">${Math.round(daily.temperature_2m_min[dayIndex])}°</span>
-                        </div>
-
-                        <!-- Main -->
-                        <div class="flex flex-col items-center pb-1 px-4">
-                            <span class="text-5xl font-black tracking-tighter dir-ltr">${mainTemp}°</span>
-                            <span class="text-[10px] opacity-60 mt-1">${mainLabel}</span>
-                        </div>
-
-                        <!-- Max -->
-                        <div class="flex flex-col items-center text-red-500">
-                            <span class="text-[10px] opacity-70 mb-1">بیشینه</span>
-                            <span class="text-xl font-bold dir-ltr">${Math.round(daily.temperature_2m_max[dayIndex])}°</span>
-                        </div>
-                    </div>
-
-                    <!-- Hourly Grid Header -->
-                    <div class="grid grid-cols-4 gap-2 mt-2">
+                    <!-- Hourly Grid -->
+                    <div class="px-4 pb-4 grid grid-cols-3 gap-3 mt-auto">
                         ${gridHTML}
                     </div>
-
-                    <!-- Footer Stats -->
-                    <div class="flex justify-between items-center text-[10px] opacity-70 pt-3 border-t border-current/10">
-                         <div class="flex items-center gap-1">
-                            <i data-lucide="cloud-rain" class="w-3 h-3"></i>
-                            <span>بارش: <span class="dir-ltr font-bold">${daily.snowfall_sum[dayIndex]} cm</span></span>
-                        </div>
-                        <div class="flex items-center gap-1">
-                             <i data-lucide="droplets" class="w-3 h-3"></i>
-                            <span>احتمال: <span class="dir-ltr font-bold">${daily.precipitation_probability_max[dayIndex]}%</span></span>
-                        </div>
-                    </div>
+                    
+                    <!-- Footer Action -->
+                    <button onclick="openHourlyDetails('${resortKey}', ${locIndex}, ${sampleHourIndex}, 'ظهر')" class="w-full py-3 bg-current/5 hover:bg-current/10 text-xs font-bold transition-all text-center border-t border-current/5">
+                        مشاهده جزئیات کامل و تحلیل دقیق
+                    </button>
                 </div>
             `;
         }
 
         async function renderResortCards(resortKey) {
             const container = document.getElementById(`cards-${resortKey}`);
-            // If container doesn't exist (first load), renderResort handles it. 
-            // But for date switching, we need to clear and rebuild only cards.
-            // Helper for createCardHTML usage
-            
             const resort = RESORTS[resortKey];
-            if(!weatherStore[resortKey]) return; // Should be loaded
+            if(!weatherStore[resortKey]) return;
 
             container.innerHTML = '';
-            
             weatherStore[resortKey].forEach((data, index) => {
                 const loc = resort.locations[index];
                 container.innerHTML += createCardHTML(loc.name, loc.alt, data, selectedDayIndex, resortKey, index);
@@ -608,19 +699,18 @@
             const data = weatherStore[resortKey][locIndex];
             const h = data.hourly;
             
-            const temp = Math.round(h.temperature_2m[hourlyIndex]);
-            const wind = Math.round(h.wind_speed_10m[hourlyIndex]);
-            const windDir = h.wind_direction_10m[hourlyIndex];
-            const humidity = h.relative_humidity_2m[hourlyIndex];
-            const cloud = h.cloud_cover[hourlyIndex];
-            const snow = h.snowfall[hourlyIndex];
-            const precip = h.precipitation[hourlyIndex];
-            const code = h.weather_code[hourlyIndex];
-            const isDay = h.is_day[hourlyIndex];
+            const rawData = {
+                temp: h.temperature_2m[hourlyIndex],
+                wind: h.wind_speed_10m[hourlyIndex],
+                gust: h.wind_gusts_10m ? h.wind_gusts_10m[hourlyIndex] : 0,
+                visibility: h.visibility ? h.visibility[hourlyIndex] : 10000,
+                cape: h.cape ? h.cape[hourlyIndex] : 0,
+                cloud: h.cloud_cover[hourlyIndex],
+                snowRate: h.snowfall[hourlyIndex],
+                isDay: h.is_day[hourlyIndex]
+            };
 
-            const weather = getWeatherStatus(code);
-            const windStatus = getWindStatus(wind);
-            const goggle = getGoggleInfo(code, isDay);
+            const analysis = analyzeSkiConditions(rawData);
             const locationName = RESORTS[resortKey].locations[locIndex].name;
             const resortName = RESORTS[resortKey].name;
 
@@ -629,79 +719,50 @@
 
             content.innerHTML = `
                 <div class="text-center border-b border-current/10 pb-4">
-                    <h3 class="text-xl font-black">${resortName} - ${locationName}</h3>
-                    <div class="inline-block bg-current/5 px-3 py-1 rounded-full mt-2">
-                        <span class="text-sm font-bold opacity-80">وضعیت ساعت ${timeLabel}</span>
+                    <h3 class="text-xl font-black">${resortName}</h3>
+                    <p class="text-sm opacity-60">${locationName} - ساعت ${timeLabel}</p>
+                </div>
+
+                <!-- Safety Dashboard -->
+                <div class="flex flex-col gap-3">
+                    <div class="flex items-center justify-between p-3 rounded-xl ${analysis.statusClass}">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="${analysis.icon}" class="w-6 h-6"></i>
+                            <span class="font-black text-lg">${analysis.decision}</span>
+                        </div>
+
                     </div>
                 </div>
 
-                <!-- Main Stats -->
-                <div class="flex justify-center items-center gap-6">
-                     <div class="flex flex-col items-center">
-                        <i data-lucide="${weather.icon}" class="w-12 h-12 accent-text mb-2"></i>
-                        <span class="font-bold opacity-80">${weather.text}</span>
-                    </div>
-                    <div class="flex flex-col items-center">
-                        <span class="text-5xl font-black dir-ltr ${temp < 0 ? 'text-blue-600' : 'text-orange-600'}">${temp}°</span>
-                        <span class="text-xs opacity-60 mt-1">دما</span>
-                    </div>
-                </div>
-
-                <!-- Grid Details -->
-                <div class="grid grid-cols-2 gap-4">
-                    <!-- Wind Section -->
-                    <div class="col-span-2 glass-card bg-white/40 p-4 rounded-xl border border-current/10">
-                        <div class="flex items-center gap-2 mb-2 opacity-80">
-                            <i data-lucide="wind" class="w-4 h-4"></i>
-                            <span class="font-bold text-sm">وضعیت باد</span>
+                <!-- Detailed Analysis Logic (The Guide) -->
+                <div class="bg-white/60 p-4 rounded-xl border border-current/10">
+                    <h4 class="text-sm font-bold mb-3 flex items-center gap-2">
+                        <i data-lucide="brain-circuit" class="w-4 h-4 text-purple-600"></i>
+                        <span>چرا این وضعیت اعلام شد؟</span>
+                    </h4>
+                    <div class="space-y-3 text-xs">
+                         <!-- Wind Logic -->
+                        <div class="flex gap-3">
+                            <div class="w-1 bg-blue-400 rounded-full"></div>
+                            <div>
+                                <strong class="block opacity-80 mb-0.5">تحلیل باد (${analysis.logic.wind.condition})</strong>
+                                <p class="opacity-70 leading-relaxed">${analysis.logic.wind.rec}</p>
+                            </div>
                         </div>
-                        <div class="flex items-center justify-between mb-2">
-                            <span class="text-2xl font-black dir-ltr ${windStatus.color}">${wind} <span class="text-sm opacity-50">km/h</span></span>
-                            <span class="font-bold text-sm ${windStatus.color}">${windStatus.label}</span>
+                         <!-- Light Logic -->
+                        <div class="flex gap-3">
+                            <div class="w-1 bg-amber-400 rounded-full"></div>
+                            <div>
+                                <strong class="block opacity-80 mb-0.5">تحلیل نور (${analysis.logic.lens.condition})</strong>
+                                <p class="opacity-70 leading-relaxed">لنز پیشنهادی: ${analysis.logic.lens.rec}</p>
+                            </div>
                         </div>
-                        <p class="text-xs opacity-70 leading-relaxed bg-white/50 p-2 rounded-lg">
-                            ${windStatus.desc}
-                        </p>
-                    </div>
-
-                    <!-- Goggle Section -->
-                    <div class="col-span-2 glass-card bg-white/40 p-4 rounded-xl border border-current/10">
-                         <div class="flex items-center gap-2 mb-2 opacity-80">
-                            <i data-lucide="${goggle.icon}" class="w-4 h-4"></i>
-                            <span class="font-bold text-sm">پیشنهاد عینک</span>
-                        </div>
-                         <div class="flex items-center justify-between mb-2">
-                            <span class="font-bold text-sm">${goggle.condition}</span>
-                             <span class="text-xs font-mono dir-ltr bg-black/5 px-2 py-1 rounded">VLT: ${goggle.vlt}</span>
-                        </div>
-                        <div class="flex flex-col gap-2 text-xs opacity-80 bg-white/50 p-3 rounded-lg">
-                             <div class="flex justify-between items-center border-b border-black/5 pb-2">
-                                <span class="font-bold opacity-70">تأثیر:</span>
-                                <span class="font-bold ${goggle.textColor}">${goggle.fullEffect || goggle.effect}</span>
-                             </div>
-                             <div class="mt-1">
-                                <p class="leading-relaxed">${goggle.tips}</p>
-                             </div>
-                        </div>
-                    </div>
-
-                    <!-- Extra Stats -->
-                    <div class="bg-white/30 p-3 rounded-xl flex flex-col items-center gap-1">
-                        <span class="text-xs opacity-60">رطوبت</span>
-                        <span class="font-bold dir-ltr">${humidity}%</span>
-                    </div>
-                    <div class="bg-white/30 p-3 rounded-xl flex flex-col items-center gap-1">
-                        <span class="text-xs opacity-60">پوشش ابر</span>
-                        <span class="font-bold dir-ltr">${cloud}%</span>
-                    </div>
-                    <div class="bg-white/30 p-3 rounded-xl flex flex-col items-center gap-1">
-                        <span class="text-xs opacity-60">بارش برف</span>
-                        <span class="font-bold dir-ltr text-blue-600">${snow} cm</span>
-                    </div>
-                    <div class="bg-white/30 p-3 rounded-xl flex flex-col items-center gap-1">
-                        <span class="text-xs opacity-60">جهت باد</span>
-                        <span class="font-bold dir-ltr" style="transform: rotate(${windDir}deg); display:inline-block">↑</span>
-                        <span class="text-[10px] opacity-50 dir-ltr">${windDir}°</span>
+                         <!-- Rule -->
+                        ${analysis.reasons.length > 0 ? `
+                        <div class="bg-red-50 p-2 rounded text-red-800 mt-2">
+                             <strong class="block mb-1">قوانین فعال شده:</strong>
+                             <ul class="list-disc list-inside opacity-80">${analysis.reasons.map(r => `<li>${r}</li>`).join('')}</ul>
+                        </div>` : ''}
                     </div>
                 </div>
             `;
@@ -722,7 +783,6 @@
             const container = document.getElementById('content-area');
             const resort = RESORTS[resortKey];
             
-            // Main Structure
             const section = document.createElement('section');
             section.className = 'mb-12 animate-float-up';
             section.innerHTML = `
@@ -732,41 +792,35 @@
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="cards-${resortKey}"></div>
             `;
-            container.innerHTML = ''; // Clear previous
+            container.innerHTML = ''; 
             container.appendChild(section);
 
-            // Render Dates
             renderDateSelector();
-
             const cardsContainer = document.getElementById(`cards-${resortKey}`);
             
             if (!weatherStore[resortKey]) weatherStore[resortKey] = [];
-
             const promises = resort.locations.map(loc => fetchWeatherData(loc.lat, loc.lon));
             const results = await Promise.all(promises);
 
             results.forEach((data, index) => {
-                weatherStore[resortKey][index] = data;
+                if(data) weatherStore[resortKey][index] = data;
             });
-            
             renderResortCards(resortKey);
         }
 
         async function loadResort(selection) {
             currentSelection = selection;
-            selectedDayIndex = 0; // Reset date on resort switch
+            selectedDayIndex = 0; 
             
             const loading = document.getElementById('loading');
             const resultArea = document.getElementById('prediction-result');
             const buttons = document.querySelectorAll('.resort-btn');
 
-            // Reset UI
             resultArea.innerHTML = ''; 
             resultArea.classList.add('hidden');
             loading.classList.remove('hidden');
             loading.classList.add('flex');
             
-            // Button Styles
             buttons.forEach(btn => {
                 btn.classList.remove('accent-bg', 'text-white', 'opacity-100', 'shadow-lg');
                 btn.classList.add('bg-transparent', 'opacity-60');
@@ -783,19 +837,14 @@
             loading.classList.remove('flex');
         }
 
-        // --- Magic Button Logic (Inline) ---
-
         function askWhenSnow() {
             const resultDiv = document.getElementById('prediction-result');
             resultDiv.innerHTML = `<div class="flex justify-center p-4"><i data-lucide="loader" class="animate-spin"></i></div>`;
             resultDiv.classList.remove('hidden');
             lucide.createIcons();
 
-            // Simulate tiny delay for "Calculating" feel
             setTimeout(() => {
                 let bestSnowEvent = null;
-                
-                // Only check the CURRENTLY selected resort
                 const rKey = currentSelection;
                 const resortData = weatherStore[rKey];
                 
@@ -809,20 +858,18 @@
                     const daysCount = data.daily.time.length;
                     for (let i = 0; i < daysCount; i++) {
                         const snowAmount = data.daily.snowfall_sum[i];
+                        const prob = data.daily.precipitation_probability_max[i];
+
                         if (snowAmount > 0) {
-                            // Priority: Sooner day > More snow
                             if (!bestSnowEvent || 
                                 i < bestSnowEvent.dayIndex || 
                                 (i === bestSnowEvent.dayIndex && snowAmount > bestSnowEvent.amount)) {
-                                
                                 bestSnowEvent = {
                                     dayIndex: i,
                                     amount: snowAmount,
-                                    prob: data.daily.precipitation_probability_max[i],
+                                    prob: prob,
                                     resort: resortName,
-                                    location: locName,
-                                    tempMax: data.daily.temperature_2m_max[i],
-                                    tempMin: data.daily.temperature_2m_min[i]
+                                    location: locName
                                 };
                             }
                         }
@@ -835,21 +882,29 @@
                     else if (bestSnowEvent.dayIndex === 1) dayName = 'فردا';
                     else if (bestSnowEvent.dayIndex === 2) dayName = 'پس‌فردا';
                     else dayName = `${bestSnowEvent.dayIndex} روز دیگه`;
+                    
+                    const dateStr = getPersianDateString(bestSnowEvent.dayIndex).fullDate;
 
-                    // Simplified Result: No specific station, no temp, just resort + day + snow amount
                     resultDiv.innerHTML = `
                         <div class="glass-card p-6 rounded-2xl border-2 border-blue-400/30 bg-blue-50/50 mt-4 relative overflow-hidden text-center">
                             <div class="absolute -left-4 -top-4 w-32 h-32 bg-blue-400/20 rounded-full blur-xl"></div>
                             <div class="relative z-10 flex flex-col items-center gap-3">
                                 <h4 class="text-2xl font-black text-blue-900">پیدا شد: ${dayName}!</h4>
-                                <div class="flex flex-col items-center gap-1">
+                                <span class="text-xs font-bold bg-white/50 px-2 py-0.5 rounded text-blue-800">${dateStr}</span>
+                                <div class="flex flex-col items-center gap-1 mt-2">
                                     <p class="text-sm opacity-80">
                                         در <strong>${bestSnowEvent.resort}</strong>
                                     </p>
-                                    <div class="flex items-center gap-2 mt-2">
-                                        <i data-lucide="snowflake" class="w-6 h-6 text-blue-500 animate-bounce"></i>
-                                        <span class="font-black text-3xl text-blue-700 dir-ltr">${bestSnowEvent.amount} cm</span>
-                                        <span class="text-sm font-bold opacity-60">برف تازه</span>
+                                    <div class="flex items-center gap-4 mt-2">
+                                        <div class="flex flex-col items-center">
+                                            <span class="font-black text-3xl text-blue-700 dir-ltr">${bestSnowEvent.amount} cm</span>
+                                            <span class="text-[10px] font-bold opacity-60">برف تازه</span>
+                                        </div>
+                                        <div class="w-px h-8 bg-blue-900/10"></div>
+                                        <div class="flex flex-col items-center">
+                                             <span class="font-black text-xl text-blue-700 dir-ltr">${bestSnowEvent.prob}%</span>
+                                             <span class="text-[10px] font-bold opacity-60">احتمال</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -859,15 +914,18 @@
                     resultDiv.innerHTML = `
                         <div class="glass-card p-4 rounded-xl border border-orange-200 bg-orange-50/50 mt-4 text-center">
                             <p class="text-sm text-orange-800 font-bold">فعلاً خبری نیست!</p>
-                            <p class="text-xs opacity-70 mt-1">تا ۱۶ روز آینده در ${RESORTS[currentSelection].name} بارش برف پیش‌بینی نشده.</p>
+                            <p class="text-xs opacity-70 mt-1">تا ۷ روز آینده در ${RESORTS[currentSelection].name} بارش برف پیش‌بینی نشده.</p>
                         </div>
                     `;
                 }
                 lucide.createIcons();
-            }, 500);
+            }, 800);
         }
 
-        // Initialize
+        function setTheme(themeName) {
+            document.body.className = `${themeName} min-h-screen flex flex-col`;
+        }
+
         window.addEventListener('DOMContentLoaded', () => {
             lucide.createIcons();
             loadResort('tochal');
