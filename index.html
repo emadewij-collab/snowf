@@ -6,7 +6,7 @@
     <title>برف‌کو | دستیار هوشمند اسکی</title>
     <meta name="description" content="پیش‌بینی تخصصی، ایمنی و وضعیت برف پیست‌های اسکی ایران">
     
-    <!-- Version: v2.2 -->
+    <!-- Version: v2.3 -->
     
     <!-- Fonts: Vazirmatn -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -19,7 +19,6 @@
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 
-    <!-- Custom Styles -->
     <style>
         body {
             font-family: 'Vazirmatn', sans-serif;
@@ -72,19 +71,13 @@
         .accent-text { color: var(--accent); }
 
         /* Animations */
-        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-6px); } 100% { transform: translateY(0px); } }
-        .animate-float { animation: float 5s ease-in-out infinite; }
-        
         @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         .fade-in { animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
         @keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        @keyframes spin-fast { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        @keyframes burst { 0% { transform: rotate(0deg) scale(1); } 50% { transform: rotate(180deg) scale(1.2); } 100% { transform: rotate(360deg) scale(1); } }
-        
         .spin-slow { animation: spin-slow 20s linear infinite; }
         
-        /* Snow particles animation */
+        /* Snow particles */
         @keyframes snowfall {
             0% { transform: translateY(-10px) translateX(0); opacity: 0; }
             10% { opacity: 1; }
@@ -106,620 +99,536 @@
         .snow-particle:nth-child(4) { left: 80%; animation-delay: 1.5s; }
         .snow-particle:nth-child(5) { left: 30%; animation-delay: 2s; }
         .snow-particle:nth-child(6) { left: 70%; animation-delay: 2.5s; }
-
-        /* Status Colors */
-        .status-go { background: linear-gradient(to right, #dcfce7, #bbf7d0); color: #14532d; border: 1px solid #86efac; }
-        .status-caution { background: linear-gradient(to right, #fef9c3, #fde047); color: #713f12; border: 1px solid #facc15; }
-        .status-stop { background: linear-gradient(to right, #fee2e2, #fecaca); color: #7f1d1d; border: 1px solid #fca5a5; }
     </style>
 </head>
 <body class="theme-snow flex flex-col">
 
     <!-- Header -->
-    <header class="w-full px-6 py-8 flex justify-between items-center max-w-7xl mx-auto z-40">
+    <header class="w-full px-4 py-6 flex flex-col md:flex-row justify-between items-center max-w-7xl mx-auto gap-4">
         <div class="flex items-center gap-4">
-            <div class="p-3 rounded-2xl accent-bg text-white shadow-lg shadow-current/20 animate-float">
+            <div class="p-3 rounded-2xl accent-bg text-white shadow-lg">
                 <i data-lucide="mountain-snow" class="w-8 h-8"></i>
             </div>
             <div>
-                <h1 class="text-3xl font-black tracking-tight text-current">برف‌کو</h1>
-                <p class="text-xs opacity-70 font-bold mt-1">دستیار هوشمند و ایمنی اسکی‌بازان</p>
+                <h1 class="text-3xl font-black">برف‌کو</h1>
+                <p class="text-xs opacity-70 font-bold mt-1">دستیار هوشمند اسکی‌بازان</p>
             </div>
         </div>
+        
+        <!-- Live Clock -->
+        <div class="glass-card px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold">
+            <i data-lucide="clock" class="w-4 h-4 opacity-60"></i>
+            <span id="live-clock" class="dir-ltr"></span>
+        </div>
 
-        <div class="flex gap-3 items-center">
-            <div class="flex bg-white/20 backdrop-blur-xl rounded-full p-1.5 border border-current/10 shadow-sm">
-                <button onclick="setTheme('theme-sun')" class="p-2.5 rounded-full hover:bg-white/40 transition-all text-amber-500"><i data-lucide="sun" class="w-5 h-5"></i></button>
-                <button onclick="setTheme('theme-snow')" class="p-2.5 rounded-full hover:bg-white/40 transition-all text-sky-500"><i data-lucide="snowflake" class="w-5 h-5"></i></button>
-                <button onclick="setTheme('theme-night')" class="p-2.5 rounded-full hover:bg-white/40 transition-all text-indigo-400"><i data-lucide="moon" class="w-5 h-5"></i></button>
-            </div>
+        <!-- Theme Switcher -->
+        <div class="flex bg-white/20 backdrop-blur-xl rounded-full p-1.5 border border-current/10">
+            <button onclick="setTheme('theme-sun')" class="p-2.5 rounded-full hover:bg-white/40 transition-all text-amber-500">
+                <i data-lucide="sun" class="w-5 h-5"></i>
+            </button>
+            <button onclick="setTheme('theme-snow')" class="p-2.5 rounded-full hover:bg-white/40 transition-all text-sky-500">
+                <i data-lucide="snowflake" class="w-5 h-5"></i>
+            </button>
+            <button onclick="setTheme('theme-night')" class="p-2.5 rounded-full hover:bg-white/40 transition-all text-indigo-400">
+                <i data-lucide="moon" class="w-5 h-5"></i>
+            </button>
         </div>
     </header>
 
     <!-- Main Content -->
-    <main class="flex-grow px-4 pb-16 max-w-7xl mx-auto w-full relative z-0">
+    <main class="flex-grow px-4 pb-16 max-w-7xl mx-auto w-full">
         
-        <!-- Modal -->
-        <div id="hourly-modal" class="fixed inset-0 z-[100] hidden flex-col items-center justify-center bg-black/60 backdrop-blur-sm p-4 fade-in" onclick="closeModal(event)">
-            <div class="glass-card w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-[2.5rem] p-0 shadow-2xl relative" onclick="event.stopPropagation()">
-                <div class="sticky top-0 bg-white/80 backdrop-blur-xl p-5 border-b border-current/5 flex justify-between items-center z-10">
-                    <div>
-                        <span class="font-black text-xl block" id="modal-title">عنوان</span>
-                        <span class="text-xs opacity-60 font-bold" id="modal-subtitle">تحلیل دقیق شرایط جوی</span>
-                    </div>
-                    <button onclick="closeModal()" class="p-2 bg-black/5 rounded-full hover:bg-black/10 transition-colors"><i data-lucide="x" class="w-6 h-6"></i></button>
-                </div>
-                <div id="modal-content" class="p-6 flex flex-col gap-6"></div>
-            </div>
-        </div>
-
         <!-- Resort Selector -->
-        <div class="flex flex-col items-center my-10 gap-10">
-            <div class="glass-card rounded-2xl p-2 flex flex-wrap justify-center gap-1 shadow-sm">
-                <button onclick="loadResort('tochal')" id="btn-tochal" class="resort-btn px-6 py-3 rounded-xl font-bold text-sm transition-all duration-300 hover:bg-current/5 opacity-70">توچال</button>
-                <button onclick="loadResort('dizin')" id="btn-dizin" class="resort-btn px-6 py-3 rounded-xl font-bold text-sm transition-all duration-300 hover:bg-current/5 opacity-70">دیزین</button>
-                <button onclick="loadResort('darbandsar')" id="btn-darbandsar" class="resort-btn px-6 py-3 rounded-xl font-bold text-sm transition-all duration-300 hover:bg-current/5 opacity-70">دربندسر</button>
-                <button onclick="loadResort('shemshak')" id="btn-shemshak" class="resort-btn px-6 py-3 rounded-xl font-bold text-sm transition-all duration-300 hover:bg-current/5 opacity-70">شمشک</button>
+        <div class="flex flex-col items-center my-8 gap-8">
+            <div class="glass-card rounded-2xl p-2 flex flex-wrap justify-center gap-1">
+                <button onclick="loadResort('tochal')" id="btn-tochal" class="resort-btn px-6 py-3 rounded-xl font-bold text-sm transition-all opacity-70 hover:opacity-100">توچال</button>
+                <button onclick="loadResort('dizin')" id="btn-dizin" class="resort-btn px-6 py-3 rounded-xl font-bold text-sm transition-all opacity-70 hover:opacity-100">دیزین</button>
+                <button onclick="loadResort('darbandsar')" id="btn-darbandsar" class="resort-btn px-6 py-3 rounded-xl font-bold text-sm transition-all opacity-70 hover:opacity-100">دربندسر</button>
+                <button onclick="loadResort('shemshak')" id="btn-shemshak" class="resort-btn px-6 py-3 rounded-xl font-bold text-sm transition-all opacity-70 hover:opacity-100">شمشک</button>
             </div>
 
-            <!-- Magic Button -->
-            <div class="flex flex-col items-center gap-4 w-full max-w-sm mx-auto perspective-1000">
-                <button onclick="askWhenSnow()" class="group relative w-24 h-24 rounded-full accent-bg text-white shadow-xl shadow-current/20 hover:shadow-2xl transition-all hover:-translate-y-1 active:scale-95 ring-4 ring-white/30 overflow-hidden flex items-center justify-center">
-                    <i data-lucide="snowflake" class="w-12 h-12 spin-slow"></i>
+            <!-- Snow Prediction Button -->
+            <div class="flex flex-col items-center gap-3">
+                <button onclick="findSnowDay()" class="w-20 h-20 rounded-full accent-bg text-white shadow-xl hover:scale-105 transition-transform flex items-center justify-center">
+                    <i data-lucide="snowflake" class="w-10 h-10 spin-slow"></i>
                 </button>
-                <span class="font-black text-lg">کی برف میاد؟</span>
+                <span class="font-bold text-lg">کی برف میاد؟</span>
             </div>
         </div>
 
-        <!-- Snow Prediction Result (Wide) -->
-        <div id="prediction-result" class="w-full max-w-7xl mx-auto hidden fade-in mb-8"></div>
+        <!-- Snow Prediction Result -->
+        <div id="snow-prediction" class="hidden max-w-4xl mx-auto mb-8 fade-in"></div>
 
         <!-- Date Selector -->
-        <div id="date-selector-container" class="w-full max-w-4xl mx-auto mb-12 hidden fade-in">
-            <div class="glass-card p-2.5 rounded-3xl overflow-x-auto hide-scroll flex gap-3 justify-start md:justify-center" id="date-selector-list"></div>
+        <div id="date-selector-wrapper" class="hidden max-w-4xl mx-auto mb-8 fade-in">
+            <div class="glass-card p-2 rounded-2xl overflow-x-auto hide-scroll flex gap-2 justify-start md:justify-center" id="date-selector"></div>
         </div>
 
         <!-- Loading -->
-        <div id="loading" class="hidden flex-col items-center justify-center py-24 opacity-50">
-            <div class="relative">
-                <div class="w-16 h-16 border-4 border-current/10 border-t-accent rounded-full animate-spin"></div>
-                <i data-lucide="snowflake" class="absolute inset-0 m-auto w-6 h-6 text-current/30 animate-pulse"></i>
-            </div>
-            <p class="text-sm font-bold mt-6 animate-pulse opacity-70">در حال تحلیل داده‌های ماهواره‌ای...</p>
+        <div id="loading" class="hidden flex-col items-center justify-center py-20">
+            <div class="w-12 h-12 border-4 border-current/10 border-t-current rounded-full animate-spin"></div>
+            <p class="text-sm font-bold mt-4 opacity-60">در حال دریافت اطلاعات...</p>
         </div>
 
-        <!-- Resort Content -->
-        <div id="content-area" class="space-y-16"></div>
-
-        <!-- Educational Guides (Hidden) -->
-        <section id="guides-section" class="hidden mt-24 pt-12 border-t border-current/10">
-            <div class="flex items-center gap-4 mb-10 justify-center md:justify-start">
-                <div class="p-3 rounded-2xl bg-blue-100/50 text-blue-700 shadow-sm"><i data-lucide="book-open-check" class="w-6 h-6"></i></div>
-                <h2 class="text-3xl font-black">راهنمای فنی و استانداردها</h2>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <!-- Wind Table -->
-                <div class="glass-card p-6 rounded-[2rem] relative overflow-hidden group hover:shadow-lg transition-all duration-500">
-                    <div class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-400 to-cyan-500"></div>
-                    <h3 class="font-bold text-lg mb-6 flex items-center gap-2 text-blue-900">
-                        <i data-lucide="wind" class="w-5 h-5 text-blue-500"></i>
-                        استاندارد باد و لیفت
-                    </h3>
-                    <div class="space-y-3 text-xs opacity-90 h-[320px] overflow-y-auto pr-2 scrollbar-thin">
-                        <div class="p-3 rounded-xl bg-green-50/50 border border-green-100">
-                            <div class="flex justify-between font-black text-green-700 mb-1"><span class="dir-ltr">0-20 km/h</span><span>ایده‌آل</span></div>
-                            <p class="opacity-70 leading-relaxed">شرایط عالی. تمام لیفت‌ها باز.</p>
-                        </div>
-                         <div class="p-3 rounded-xl bg-blue-50/50 border border-blue-100">
-                            <div class="flex justify-between font-black text-blue-700 mb-1"><span class="dir-ltr">20-30 km/h</span><span>محسوس</span></div>
-                            <p class="opacity-70 leading-relaxed">برف کمی جابجا می‌شود (Wind-drift). لیفت‌ها باز.</p>
-                        </div>
-                        <div class="p-3 rounded-xl bg-yellow-50/50 border border-yellow-100">
-                            <div class="flex justify-between font-black text-yellow-700 mb-1"><span class="dir-ltr">30-40 km/h</span><span>مشکل لبه‌گیری</span></div>
-                            <p class="opacity-70 leading-relaxed">یخ‌زایی سطحی. کاهش دید. احتمال محدودیت لیفت.</p>
-                        </div>
-                        <div class="p-3 rounded-xl bg-orange-50/50 border border-orange-100">
-                            <div class="flex justify-between font-black text-orange-700 mb-1"><span class="dir-ltr">40-60 km/h</span><span>ریسک بالا</span></div>
-                            <p class="opacity-70 leading-relaxed">تله‌سیژها غالباً بسته. برف سفت/یخ‌زده. Whiteout.</p>
-                        </div>
-                        <div class="p-3 rounded-xl bg-red-50/50 border border-red-100">
-                            <div class="flex justify-between font-black text-red-700 mb-1"><span class="dir-ltr">60+ km/h</span><span>طوفان</span></div>
-                            <p class="opacity-70 leading-relaxed">تعطیلی کامل پیست. دید نزدیک صفر.</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- CAPE Guide -->
-                <div class="glass-card p-6 rounded-[2rem] relative overflow-hidden group hover:shadow-lg transition-all duration-500">
-                    <div class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-purple-400 to-pink-600"></div>
-                    <h3 class="font-bold text-lg mb-6 flex items-center gap-2 text-purple-900">
-                        <i data-lucide="zap" class="w-5 h-5 text-purple-500"></i>
-                        ناپایداری جو (CAPE)
-                    </h3>
-                     <div class="space-y-3 text-xs opacity-90 h-[320px] overflow-y-auto pr-2">
-                        <div class="p-3 rounded-xl bg-green-50/50 border border-green-100">
-                            <div class="flex justify-between font-black text-green-700 mb-1"><span class="dir-ltr">0</span><span>پایدار</span></div>
-                            <p class="opacity-70">بهترین زمان؛ رعدوبرق ≈ صفر</p>
-                        </div>
-                         <div class="p-3 rounded-xl bg-teal-50/50 border border-teal-100">
-                            <div class="flex justify-between font-black text-teal-700 mb-1"><span class="dir-ltr">1-500</span><span>ناپایداری کم</span></div>
-                            <p class="opacity-70">تغییرات محلی کوچک یا رگبار پراکنده.</p>
-                        </div>
-                         <div class="p-3 rounded-xl bg-orange-50/50 border border-orange-100">
-                            <div class="flex justify-between font-black text-orange-700 mb-1"><span class="dir-ltr">500-1000</span><span>رعدوبرق پراکنده</span></div>
-                            <p class="opacity-70">احتیاط؛ احتمال وزش باد ناگهانی (Gust).</p>
-                        </div>
-                         <div class="p-3 rounded-xl bg-red-50/50 border border-red-100">
-                            <div class="flex justify-between font-black text-red-700 mb-1"><span class="dir-ltr">1000+</span><span>توفان خطرناک</span></div>
-                            <p class="opacity-70">خطر صاعقه بالا. ارتفاعات نروید.</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Lens Guide -->
-                <div class="glass-card p-6 rounded-[2rem] relative overflow-hidden group hover:shadow-lg transition-all duration-500">
-                    <div class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-orange-400 to-amber-500"></div>
-                    <h3 class="font-bold text-lg mb-6 flex items-center gap-2 text-amber-900">
-                        <i data-lucide="glasses" class="w-5 h-5 text-amber-500"></i>
-                        راهنمای انتخاب لنز
-                    </h3>
-                    <div class="space-y-3 text-xs opacity-90 h-[320px] overflow-y-auto pr-2">
-                        <div class="p-3 rounded-xl bg-gray-100/50 border border-gray-200">
-                            <div class="flex justify-between font-black text-gray-700 mb-1"><span>آفتابی شدید</span><span class="dir-ltr">5-10%</span></div>
-                            <p class="opacity-70">لنز تیره/آینه‌ای. کاهش خیرگی.</p>
-                        </div>
-                        <div class="p-3 rounded-xl bg-amber-50/50 border border-amber-100">
-                            <div class="flex justify-between font-black text-amber-700 mb-1"><span>آفتابی متوسط</span><span class="dir-ltr">10-25%</span></div>
-                            <p class="opacity-70">لنز قهوه‌ای/برنزی. تشخیص عمق.</p>
-                        </div>
-                        <div class="p-3 rounded-xl bg-orange-50/50 border border-orange-100">
-                            <div class="flex justify-between font-black text-orange-700 mb-1"><span>متغیر / نیمه‌ابری</span><span class="dir-ltr">18-35%</span></div>
-                            <p class="opacity-70">لنز نارنجی/رز. تقویت سایه‌ها.</p>
-                        </div>
-                         <div class="p-3 rounded-xl bg-rose-50/50 border border-rose-100">
-                            <div class="flex justify-between font-black text-rose-700 mb-1"><span>نور تخت (Flat)</span><span class="dir-ltr">35-60%</span></div>
-                            <p class="opacity-70">لنز صورتی/زرد روشن. آشکارسازی پستی بلندی.</p>
-                        </div>
-                        <div class="p-3 rounded-xl bg-yellow-50/50 border border-yellow-100">
-                            <div class="flex justify-between font-black text-yellow-700 mb-1"><span>مه / Whiteout</span><span class="dir-ltr">50-80%</span></div>
-                            <p class="opacity-70">لنز زرد قوی. حداکثر کنتراست.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
+        <!-- Weather Cards -->
+        <div id="weather-cards" class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-7xl mx-auto"></div>
 
     </main>
 
     <!-- Footer -->
-    <footer class="w-full py-10 text-center text-xs opacity-60 border-t border-current/5 bg-current/5">
-        <p class="font-mono dir-ltr mb-2 font-bold">Barf Ko v2.2</p>
-        <p>طراحی شده با ❤️ برای جامعه اسکی ایران</p>
+    <footer class="w-full py-8 text-center text-xs opacity-50 border-t border-current/5">
+        <p class="font-mono dir-ltr mb-1">Barf Ko v2.3</p>
+        <p>طراحی شده با ❤️ برای اسکی‌بازان ایران</p>
     </footer>
 
-    <!-- Logic -->
     <script>
-        // --- 1. Configuration & Data ---
-        const RESORTS = {
-            tochal: {
-                id: 'tochal',
-                name: 'پیست بین‌المللی توچال',
-                locations: [
-                    { name: 'ایستگاه ۷ (قله)', alt: '3740m', lat: 35.8853, lon: 51.4150 },
-                    { name: 'ایستگاه ۵', alt: '2935m', lat: 35.8600, lon: 51.4080 },
-                    { name: 'ایستگاه ۱', alt: '1900m', lat: 35.8195, lon: 51.4100 }
-                ]
-            },
-            dizin: {
-                id: 'dizin',
-                name: 'پیست بین‌المللی دیزین',
-                locations: [
-                    { name: 'قله (سی‌چال)', alt: '3600m', lat: 36.0540, lon: 51.4180 },
-                    { name: 'پارکینگ بالا', alt: '3000m', lat: 36.0460, lon: 51.4150 },
-                    { name: 'پایین (هتل)', alt: '2650m', lat: 36.0350, lon: 51.4100 }
-                ]
-            },
-            darbandsar: {
-                id: 'darbandsar',
-                name: 'پیست اسکی دربندسر',
-                locations: [
-                    { name: 'قله', alt: '3570m', lat: 36.0180, lon: 51.4650 },
-                    { name: 'میان‌راه', alt: '3000m', lat: 36.0150, lon: 51.4600 },
-                    { name: 'پایین', alt: '2600m', lat: 36.0100, lon: 51.4550 }
-                ]
-            },
-            shemshak: {
-                id: 'shemshak',
-                name: 'پیست اسکی شمشک',
-                locations: [
-                    { name: 'قله', alt: '3050m', lat: 36.0220, lon: 51.4890 },
-                    { name: 'آفتاب (میانی)', alt: '2550m', lat: 36.0150, lon: 51.4950 },
-                    { name: 'شب (پایین)', alt: '2550m', lat: 36.0100, lon: 51.4900 }
-                ]
-            }
+    // ============================================
+    // 1. DATE UTILITIES - Using API Dates (Tehran Timezone)
+    // ============================================
+    
+    const WEEKDAYS_EN = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const WEEKDAYS_FA = ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه'];
+    
+    // Store API dates globally
+    let apiDates = [];
+    
+    function parseApiDate(dateStr) {
+        // API returns dates like "2024-12-08"
+        const [year, month, day] = dateStr.split('-').map(Number);
+        return new Date(year, month - 1, day, 12, 0, 0);
+    }
+    
+    function formatPersianDate(date) {
+        return new Intl.DateTimeFormat('fa-IR', {
+            day: 'numeric',
+            month: 'long'
+        }).format(date);
+    }
+    
+    function getDayLabel(dayIndex, date) {
+        if (dayIndex === 0) return 'امروز';
+        if (dayIndex === 1) return 'فردا';
+        const dayOfWeek = date.getDay();
+        return WEEKDAYS_FA[dayOfWeek];
+    }
+    
+    function updateClock() {
+        const now = new Date();
+        const formatted = new Intl.DateTimeFormat('fa-IR', {
+            timeZone: 'Asia/Tehran',
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        }).format(now);
+        document.getElementById('live-clock').textContent = formatted;
+    }
+    
+    // ============================================
+    // 2. RESORT DATA
+    // ============================================
+    
+    const RESORTS = {
+        tochal: {
+            name: 'پیست توچال',
+            locations: [
+                { name: 'ایستگاه ۷ (قله)', alt: 3740, lat: 35.8853, lon: 51.4150 },
+                { name: 'ایستگاه ۵', alt: 2935, lat: 35.8600, lon: 51.4080 },
+                { name: 'ایستگاه ۱', alt: 1900, lat: 35.8195, lon: 51.4100 }
+            ]
+        },
+        dizin: {
+            name: 'پیست دیزین',
+            locations: [
+                { name: 'قله (سی‌چال)', alt: 3600, lat: 36.0540, lon: 51.4180 },
+                { name: 'پارکینگ بالا', alt: 3000, lat: 36.0460, lon: 51.4150 },
+                { name: 'پایین (هتل)', alt: 2650, lat: 36.0350, lon: 51.4100 }
+            ]
+        },
+        darbandsar: {
+            name: 'پیست دربندسر',
+            locations: [
+                { name: 'قله', alt: 3570, lat: 36.0180, lon: 51.4650 },
+                { name: 'میان‌راه', alt: 3000, lat: 36.0150, lon: 51.4600 },
+                { name: 'پایین', alt: 2600, lat: 36.0100, lon: 51.4550 }
+            ]
+        },
+        shemshak: {
+            name: 'پیست شمشک',
+            locations: [
+                { name: 'قله', alt: 3050, lat: 36.0220, lon: 51.4890 },
+                { name: 'میانی', alt: 2550, lat: 36.0150, lon: 51.4950 },
+                { name: 'پایین', alt: 2550, lat: 36.0100, lon: 51.4900 }
+            ]
+        }
+    };
+    
+    // ============================================
+    // 3. STATE
+    // ============================================
+    
+    let currentResort = 'tochal';
+    let selectedDay = 0;
+    let weatherCache = {};
+    
+    // ============================================
+    // 4. API
+    // ============================================
+    
+    async function fetchWeather(lat, lon) {
+        const params = [
+            'temperature_2m', 'relative_humidity_2m', 'dew_point_2m', 'apparent_temperature',
+            'weather_code', 'wind_speed_10m', 'wind_speed_80m', 'wind_direction_10m',
+            'wind_gusts_10m', 'visibility', 'cloud_cover', 'cloud_cover_low',
+            'cloud_cover_mid', 'cloud_cover_high', 'precipitation', 'rain', 'snowfall',
+            'snow_depth', 'pressure_msl', 'cape', 'lifted_index', 'freezing_level_height', 'is_day'
+        ].join(',');
+        
+        const dailyParams = [
+            'weather_code', 'temperature_2m_max', 'temperature_2m_min', 'snowfall_sum',
+            'precipitation_probability_max', 'precipitation_sum', 'uv_index_max',
+            'wind_speed_10m_max', 'wind_gusts_10m_max'
+        ].join(',');
+        
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=${params}&daily=${dailyParams}&current=temperature_2m,relative_humidity_2m,wind_speed_10m&forecast_days=16&timezone=Asia/Tehran`;
+        
+        try {
+            const res = await fetch(url);
+            return await res.json();
+        } catch (e) {
+            console.error('API Error:', e);
+            return null;
+        }
+    }
+    
+    // ============================================
+    // 5. WEATHER ANALYSIS
+    // ============================================
+    
+    function analyzeWeather(hourlyData, dailyData, dayIndex, altitude) {
+        const h = hourlyData;
+        const hourIdx = (dayIndex * 24) + 12; // noon
+        
+        const get = (arr, i, def = 0) => (arr && arr[i] !== undefined) ? arr[i] : def;
+        
+        // Extract values
+        const temp = get(h.temperature_2m, hourIdx);
+        const humidity = get(h.relative_humidity_2m, hourIdx);
+        const dewPoint = get(h.dew_point_2m, hourIdx);
+        const apparentTemp = get(h.apparent_temperature, hourIdx);
+        const wind = get(h.wind_speed_10m, hourIdx);
+        const wind80m = get(h.wind_speed_80m, hourIdx);
+        const windGust = get(h.wind_gusts_10m, hourIdx);
+        const windDir = get(h.wind_direction_10m, hourIdx);
+        const visibility = get(h.visibility, hourIdx, 10000);
+        const cloud = get(h.cloud_cover, hourIdx);
+        const cloudLow = get(h.cloud_cover_low, hourIdx);
+        const cloudMid = get(h.cloud_cover_mid, hourIdx);
+        const cloudHigh = get(h.cloud_cover_high, hourIdx);
+        const precipitation = get(h.precipitation, hourIdx);
+        const rain = get(h.rain, hourIdx);
+        const snowfall = get(h.snowfall, hourIdx);
+        const snowDepth = get(h.snow_depth, hourIdx);
+        const pressure = get(h.pressure_msl, hourIdx, 1013);
+        const cape = get(h.cape, hourIdx);
+        const li = get(h.lifted_index, hourIdx);
+        const freezeLevel = get(h.freezing_level_height, hourIdx, 3000);
+        const isDay = get(h.is_day, hourIdx, 1);
+        const uv = get(dailyData.uv_index_max, dayIndex, 0);
+        const snowfall24h = get(dailyData.snowfall_sum, dayIndex, 0);
+        
+        // Wind Analysis
+        let windStatus, windLift;
+        if (wind <= 20) { windStatus = 'ایده‌آل'; windLift = 'همه لیفت‌ها باز'; }
+        else if (wind <= 35) { windStatus = 'قابل قبول'; windLift = 'لیفت‌ها باز'; }
+        else if (wind <= 50) { windStatus = 'نامناسب'; windLift = 'محدودیت لیفت'; }
+        else { windStatus = 'خطرناک'; windLift = 'تعطیل'; }
+        
+        // Wind Direction
+        const directions = ['شمال', 'شمال‌شرق', 'شرق', 'جنوب‌شرق', 'جنوب', 'جنوب‌غرب', 'غرب', 'شمال‌غرب'];
+        const windDirName = directions[Math.round(windDir / 45) % 8];
+        
+        // Visibility
+        let visStatus;
+        if (visibility >= 10000) visStatus = 'عالی';
+        else if (visibility >= 5000) visStatus = 'خوب';
+        else if (visibility >= 1000) visStatus = 'متوسط';
+        else visStatus = 'ضعیف';
+        
+        // Lens Recommendation
+        let lens, lensVLT;
+        if (!isDay) { lens = 'شفاف'; lensVLT = '80-95%'; }
+        else if (visibility < 1000 || cloud > 80) { lens = 'زرد'; lensVLT = '50-80%'; }
+        else if (cloud > 50) { lens = 'نارنجی'; lensVLT = '30-50%'; }
+        else if (cloud > 20) { lens = 'برنزی'; lensVLT = '15-30%'; }
+        else { lens = 'تیره/آینه‌ای'; lensVLT = '5-15%'; }
+        
+        // Snow Quality
+        let snowQuality;
+        if (temp < -10 && humidity < 50) snowQuality = 'پودر خشک';
+        else if (temp < -5 && humidity < 70) snowQuality = 'پودر';
+        else if (temp >= 0) snowQuality = 'آبکی';
+        else if (temp < -10 && wind > 30) snowQuality = 'یخ‌زده';
+        else snowQuality = 'فشرده';
+        
+        // CAPE + LI Combined Analysis
+        let capeStatus, skiResult;
+        if (cape <= 100 && li >= 0) {
+            capeStatus = 'پایدار';
+            skiResult = 'پایدار';
+        } else if (cape <= 500 && li >= -3) {
+            capeStatus = 'ناپایداری کم';
+            skiResult = 'امکان رگبار ناگهانی – احتیاط';
+        } else if (cape <= 1000 && li >= -5) {
+            capeStatus = 'ناپایدار';
+            skiResult = 'رعدوبرق پراکنده – خطر متوسط';
+        } else if (cape <= 2500) {
+            capeStatus = 'خطرناک';
+            skiResult = 'توفان قوی – صعود ممنوع';
+        } else {
+            capeStatus = 'بسیار خطرناک';
+            skiResult = 'پیست باید بسته شود';
+        }
+        
+        // Avalanche Risk
+        let avalancheRisk;
+        if (snowfall24h > 30 || (wind > 40 && snowfall24h > 15)) avalancheRisk = 'بالا';
+        else if (snowfall24h > 15 || rain > 0) avalancheRisk = 'متوسط';
+        else avalancheRisk = 'کم';
+        
+        // Fog Probability
+        const dewSpread = temp - dewPoint;
+        let fogRisk = dewSpread < 2 ? 'بالا' : (dewSpread < 5 ? 'متوسط' : 'کم');
+        
+        // Pressure Condition
+        let pressureStatus;
+        if (pressure > 1020) pressureStatus = 'پایدار';
+        else if (pressure > 1010) pressureStatus = 'نرمال';
+        else pressureStatus = 'ناپایدار';
+        
+        // Final Status
+        let status = 'go';
+        let statusText = 'مناسب';
+        let statusColor = 'text-green-600';
+        let lightColor = 'bg-green-500';
+        let reasons = [];
+        
+        if (wind > 50 || visibility < 500 || cape > 1000) {
+            status = 'stop';
+            statusText = 'نامناسب';
+            statusColor = 'text-red-600';
+            lightColor = 'bg-red-500';
+            if (wind > 50) reasons.push('باد شدید');
+            if (visibility < 500) reasons.push('دید ضعیف');
+            if (cape > 1000) reasons.push('ناپایداری جو');
+        } else if (wind > 35 || visibility < 2000 || cape > 500 || uv > 8) {
+            status = 'caution';
+            statusText = 'احتیاط';
+            statusColor = 'text-amber-600';
+            lightColor = 'bg-amber-500';
+            if (wind > 35) reasons.push('باد زیاد');
+            if (visibility < 2000) reasons.push('دید متوسط');
+            if (cape > 500) reasons.push('ناپایداری');
+            if (uv > 8) reasons.push('UV بالا');
+        }
+        
+        // Wind Chill
+        const windChill = Math.round(13.12 + 0.6215 * temp - 11.37 * Math.pow(wind, 0.16) + 0.3965 * temp * Math.pow(wind, 0.16));
+        
+        return {
+            temp: Math.round(temp),
+            tempMax: Math.round(dailyData.temperature_2m_max[dayIndex]),
+            tempMin: Math.round(dailyData.temperature_2m_min[dayIndex]),
+            apparentTemp: Math.round(apparentTemp),
+            windChill,
+            humidity: Math.round(humidity),
+            dewPoint: Math.round(dewPoint),
+            dewSpread: Math.round(dewSpread),
+            wind: Math.round(wind),
+            wind80m: Math.round(wind80m),
+            windGust: Math.round(windGust),
+            windDir: Math.round(windDir),
+            windDirName,
+            windStatus,
+            windLift,
+            visibility: Math.round(visibility / 1000 * 10) / 10,
+            visStatus,
+            cloud: Math.round(cloud),
+            cloudLow: Math.round(cloudLow),
+            cloudMid: Math.round(cloudMid),
+            cloudHigh: Math.round(cloudHigh),
+            precipitation: Math.round(precipitation * 10) / 10,
+            rain: Math.round(rain * 10) / 10,
+            snowfall: Math.round(snowfall * 10) / 10,
+            snowfall24h: Math.round(snowfall24h),
+            snowDepth: Math.round(snowDepth),
+            snowQuality,
+            pressure: Math.round(pressure),
+            pressureStatus,
+            cape: Math.round(cape),
+            li: Math.round(li * 10) / 10,
+            capeStatus,
+            skiResult,
+            freezeLevel: Math.round(freezeLevel),
+            uv,
+            lens,
+            lensVLT,
+            avalancheRisk,
+            fogRisk,
+            status,
+            statusText,
+            statusColor,
+            lightColor,
+            reasons
         };
-
-        const weatherStore = {};
-        let currentSelection = 'tochal';
-        let selectedDayIndex = 0;
-
-        // --- 2. Analysis Engine ---
+    }
+    
+    // ============================================
+    // 6. UI RENDERING
+    // ============================================
+    
+    function renderDateSelector() {
+        const container = document.getElementById('date-selector');
+        const data = weatherCache[currentResort];
         
-        function analyzeConditions(data) {
-            const wind = data.wind;
-            const windGust = data.windGust || wind * 1.5;
-            const vis = data.vis;
-            const cloud = data.cloud;
-            const temp = data.temp;
-            const cape = data.cape || 0;
-            const liftedIndex = data.liftedIndex || 0;
-            const isDay = data.isDay;
-            const freezeLvl = data.freezeLvl;
-            const stationAlt = parseInt(data.alt) || 3000;
-            const uv = data.uv || 0;
-            const precipitation = data.precipitation || 0;
-            const humidity = data.humidity || 0;
-
-            // Wind Analysis
-            let windCond, windRec, liftStatus;
-            let windRiskLevel = 0;
-
-            if (wind <= 10) {
-                windCond = "ایده‌آل (آرام)";
-                windRec = "شرایط فنی عالی. برف بدون تغییر.";
-                liftStatus = "تمام لیفت‌ها باز";
-            } else if (wind <= 20) {
-                windCond = "کمی محسوس";
-                windRec = "کمی جابه‌جایی پودر برف.";
-                liftStatus = "تمام لیفت‌ها باز";
-            } else if (wind <= 30) {
-                windCond = "تغییر در کنترل";
-                windRec = "برف بادخورده (Wind-drift).";
-                liftStatus = "باز (تحت نظارت)";
-            } else if (wind <= 40) {
-                windCond = "مشکل لبه‌گیری";
-                windRec = "یخ‌زایی سطحی. کاهش دید.";
-                liftStatus = "احتمال محدودیت";
-                windRiskLevel = 1;
-            } else if (wind <= 50) {
-                windCond = "ریسک بالا";
-                windRec = "برف سفت/یخ‌زده. کنترل سخت.";
-                liftStatus = "تله‌سیژها غالباً بسته";
-                windRiskLevel = 2;
-            } else if (wind <= 60) {
-                windCond = "خطرناک";
-                windRec = "Whiteout. تعادل دشوار.";
-                liftStatus = "فقط کابین (احتیاط)";
-                windRiskLevel = 2;
-            } else {
-                windCond = "طوفان / بسیار خطرناک";
-                windRec = "شرایط غیرقابل اسکی.";
-                liftStatus = "تعطیلی کامل";
-                windRiskLevel = 3;
-            }
-
-            // Lens Analysis
-            let lensCond, lensRec, lensVLT;
-            if (isDay === 0) {
-                lensCond = "شب / نور مصنوعی";
-                lensRec = "لنز شفاف (Clear).";
-                lensVLT = "80-95%";
-            } else if (vis < 500 || (cloud > 90 && wind > 40)) {
-                lensCond = "مه سنگین / Whiteout";
-                lensRec = "زرد قوی / صورتی روشن.";
-                lensVLT = "50-80%";
-            } else if (cloud > 75) {
-                lensCond = "ابری / Flat-Light";
-                lensRec = "زرد / نارنجی روشن / Rose.";
-                lensVLT = "35-60%";
-            } else if (cloud > 40) {
-                lensCond = "نیمه ابری / متغیر";
-                lensRec = "نارنجی / رز / کاپر.";
-                lensVLT = "18-35%";
-            } else if (cloud > 15) {
-                lensCond = "آفتابی متوسط";
-                lensRec = "برنزی / قهوه‌ای.";
-                lensVLT = "10-25%";
-            } else {
-                lensCond = "آفتابی شدید";
-                lensRec = "خاکستری / مشکی / آینه‌ای.";
-                lensVLT = "5-10%";
-            }
-
-            // CAPE + LI Combined Analysis (New Scenario Table)
-            let capeCond, capeRec, liCond, skiResult;
-            let capeRiskLevel = 0;
-            
-            if (cape <= 100 && liftedIndex >= 0) {
-                capeCond = "پایدار";
-                capeRec = "CIN مثبت";
-                liCond = "پایدار";
-                skiResult = "پایدار";
-                capeRiskLevel = 0;
-            } else if (cape <= 500 && liftedIndex >= -3) {
-                capeCond = "ناپایداری کم";
-                capeRec = "CIN ممکن است بشکند";
-                liCond = "نیمه پایدار";
-                skiResult = "امکان رگبار ناگهانی – احتیاط";
-                capeRiskLevel = 1;
-            } else if (cape <= 1000 && liftedIndex >= -5) {
-                capeCond = "رعدوبرق پراکنده";
-                capeRec = "CIN در حال شکست";
-                liCond = "ناپایدار متوسط";
-                skiResult = "رعدوبرق پراکنده – خطر متوسط";
-                capeRiskLevel = 2;
-            } else if (cape <= 2500 && liftedIndex >= -6) {
-                capeCond = "توفان قوی";
-                capeRec = "CIN شکسته";
-                liCond = "ناپایدار شدید";
-                skiResult = "توفان قوی – صعود ممنوع";
-                capeRiskLevel = 3;
-            } else {
-                capeCond = "بسیار خطرناک";
-                capeRec = "CIN تقریباً صفر";
-                liCond = "بسیار ناپایدار";
-                skiResult = "پیست باید بسته شود";
-                capeRiskLevel = 4;
-            }
-
-            // Freezing Level Analysis
-            let surfaceCond = "نرمال";
-            if (freezeLvl > stationAlt + 200) surfaceCond = "برف آبکی (Slush)";
-            else if (freezeLvl < stationAlt - 500) surfaceCond = "پودر خشک (Dry Powder)";
-            else surfaceCond = "متغیر / یخ‌زده";
-
-            // Visibility Analysis
-            let visCond;
-            if (vis > 10000) visCond = "عالی";
-            else if (vis > 5000) visCond = "خوب";
-            else if (vis > 2000) visCond = "متوسط";
-            else if (vis > 1000) visCond = "ضعیف";
-            else visCond = "بسیار ضعیف";
-
-            // Final Decision
-            let status = "GO";
-            let statusText = "وضعیت مساعد";
-            let statusColor = "text-green-600";
-            let lightColor = "bg-green-500";
-            let reasons = [];
-
-            if (windRiskLevel === 3 || vis < 200 || capeRiskLevel >= 3) {
-                status = "NO-GO";
-                statusText = "خطرناک / ممنوع";
-                statusColor = "text-red-600";
-                lightColor = "bg-red-500";
-                if(windRiskLevel === 3) reasons.push(`باد بسیار شدید (${wind} km/h)`);
-                if(vis < 200) reasons.push("دید افقی ناکافی (<200m)");
-                if(capeRiskLevel >= 3) reasons.push(`${capeCond} (CAPE: ${Math.round(cape)})`);
-            } else if (windRiskLevel >= 1 || vis < 1000 || capeRiskLevel >= 1 || uv > 8) {
-                status = "CAUTION";
-                statusText = "احتیاط کنید";
-                statusColor = "text-amber-600";
-                lightColor = "bg-amber-500";
-                if(windRiskLevel >= 1) reasons.push(`باد قابل توجه (${wind} km/h)`);
-                if(vis < 1000) reasons.push("کاهش دید افقی");
-                if(capeRiskLevel >= 1) reasons.push("ناپایداری جوی");
-                if(uv > 8) reasons.push("اشعه فرابنفش بسیار زیاد");
-            }
-
-            return {
-                status, statusText, statusColor, lightColor, reasons,
-                wind: { val: wind, gust: Math.round(windGust), cond: windCond, rec: windRec, lift: liftStatus },
-                lens: { cond: lensCond, rec: lensRec, vlt: lensVLT },
-                cape: { val: Math.round(cape), cond: capeCond, rec: capeRec, skiResult: skiResult },
-                liftedIndex: { val: Math.round(liftedIndex * 10) / 10, cond: liCond, skiResult: skiResult },
-                surface: { val: surfaceCond, freezeLvl: Math.round(freezeLvl) },
-                visibility: { val: (vis / 1000).toFixed(1), cond: visCond },
-                uv: { val: uv, cond: uv > 6 ? "زیاد (خطر آفتاب‌سوختگی)" : "نرمال" },
-                precipitation: { val: precipitation },
-                humidity: { val: humidity },
-                cloudCover: { val: cloud },
-                realFeel: Math.round(13.12 + 0.6215 * temp - 11.37 * Math.pow(wind, 0.16) + 0.3965 * temp * Math.pow(wind, 0.16))
-            };
+        // Get dates from API response (they are in Tehran timezone)
+        if (!data || !data[0] || !data[0].daily || !data[0].daily.time) {
+            console.error('No API dates available');
+            return;
         }
-
-        // --- 3. API Interaction ---
         
-        async function fetchWeather(lat, lon) {
-            const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&daily=weather_code,temperature_2m_max,temperature_2m_min,snowfall_sum,precipitation_probability_max,precipitation_sum,uv_index_max&hourly=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,wind_gusts_10m,is_day,visibility,cloud_cover,snowfall,precipitation,cape,lifted_index,freezing_level_height&forecast_days=16&timezone=Asia%2FTehran`;
-            try {
-                const res = await fetch(url);
-                if(!res.ok) throw new Error("API Error");
-                return await res.json();
-            } catch (e) { 
-                console.error(e);
-                return null; 
-            }
-        }
-
-        function getPersianDate(offset) {
-            const d = new Date();
-            d.setDate(d.getDate() + offset);
-            const days = ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه'];
-            return {
-                day: offset === 0 ? 'امروز' : (offset === 1 ? 'فردا' : days[d.getDay()]),
-                full: new Intl.DateTimeFormat('fa-IR', { day: 'numeric', month: 'long' }).format(d)
-            };
-        }
-
-        // --- 4. Rendering Logic ---
-
-        async function loadResort(key) {
-            currentSelection = key;
-            selectedDayIndex = 0;
+        apiDates = data[0].daily.time; // e.g., ["2024-12-08", "2024-12-09", ...]
+        
+        let html = '';
+        for (let i = 0; i < apiDates.length; i++) {
+            const date = parseApiDate(apiDates[i]);
+            const label = getDayLabel(i, date);
+            const persianDate = formatPersianDate(date);
+            const isActive = i === selectedDay;
             
-            // Clear prediction result when resort changes
-            const predictionResult = document.getElementById('prediction-result');
-            predictionResult.innerHTML = '';
-            predictionResult.classList.add('hidden');
-            
-            document.querySelectorAll('.resort-btn').forEach(b => {
-                b.classList.remove('accent-bg', 'text-white', 'shadow-lg', 'opacity-100');
-                b.classList.add('hover:bg-current/5', 'opacity-70');
-            });
-            document.getElementById(`btn-${key}`).classList.add('accent-bg', 'text-white', 'shadow-lg', 'opacity-100');
-            document.getElementById(`btn-${key}`).classList.remove('hover:bg-current/5', 'opacity-70');
-            
-            const container = document.getElementById('content-area');
-            container.innerHTML = '';
-            document.getElementById('loading').classList.replace('hidden','flex');
-            
-            const resort = RESORTS[key];
-            container.innerHTML = `
-                <div>
-                    <h2 class="text-3xl font-black mb-8 text-center md:text-right flex items-center gap-3 justify-center md:justify-start">
-                        ${resort.name}
-                        <span class="text-xs bg-current/5 px-3 py-1 rounded-full opacity-60">۳ ارتفاع</span>
-                    </h2>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-8" id="cards-container"></div>
-                </div>
+            html += `
+                <button onclick="selectDay(${i})" 
+                    class="flex flex-col items-center px-4 py-2 rounded-xl min-w-[85px] transition-all
+                    ${isActive ? 'accent-bg text-white shadow-lg' : 'bg-white/30 hover:bg-white/50'}">
+                    <span class="text-xs opacity-80">${label}</span>
+                    <span class="text-sm font-bold whitespace-nowrap">${persianDate}</span>
+                </button>
             `;
-            
-            renderDateSelector();
-            await loadCards(key);
-            
-            document.getElementById('loading').classList.replace('flex','hidden');
         }
-
-        async function loadCards(resortKey) {
-            const container = document.getElementById('cards-container');
-            const resort = RESORTS[resortKey];
-            
-            if(!weatherStore[resortKey]) {
-                const promises = resort.locations.map(l => fetchWeather(l.lat, l.lon));
-                const data = await Promise.all(promises);
-                weatherStore[resortKey] = data;
-            }
-
-            container.innerHTML = '';
-            weatherStore[resortKey].forEach((data, idx) => {
-                if(data) container.innerHTML += createCard(resort.locations[idx], data, idx, resortKey);
-                else container.innerHTML += `<div class="glass-card p-6 rounded-3xl text-center text-red-500 font-bold">خطا در دریافت اطلاعات</div>`;
-            });
-            lucide.createIcons();
+        
+        container.innerHTML = html;
+        document.getElementById('date-selector-wrapper').classList.remove('hidden');
+    }
+    
+    function renderWeatherCards() {
+        const container = document.getElementById('weather-cards');
+        const resort = RESORTS[currentResort];
+        const data = weatherCache[currentResort];
+        
+        if (!data) {
+            container.innerHTML = '<p class="text-center text-red-500 col-span-3">خطا در دریافت اطلاعات</p>';
+            return;
         }
-
-        function createCard(loc, data, locIdx, resortKey) {
-            const daily = data.daily;
-            const h = data.hourly;
-            const hourIdx = (selectedDayIndex * 24) + 12;
-
-            const mainTemp = selectedDayIndex === 0 ? Math.round(data.current.temperature_2m) : Math.round(daily.temperature_2m_max[selectedDayIndex]);
+        
+        let html = '';
+        
+        data.forEach((locData, idx) => {
+            if (!locData) return;
             
-            const getVal = (arr, i, def) => (arr && arr[i] !== undefined) ? arr[i] : def;
-
-            const analysis = analyzeConditions({
-                temp: getVal(h.temperature_2m, hourIdx, 0),
-                wind: getVal(h.wind_speed_10m, hourIdx, 0),
-                windGust: getVal(h.wind_gusts_10m, hourIdx, 0),
-                vis: getVal(h.visibility, hourIdx, 10000),
-                cloud: getVal(h.cloud_cover, hourIdx, 0),
-                cape: getVal(h.cape, hourIdx, 0),
-                liftedIndex: getVal(h.lifted_index, hourIdx, 0),
-                freezeLvl: getVal(h.freezing_level_height, hourIdx, 3000),
-                uv: getVal(daily.uv_index_max, selectedDayIndex, 0),
-                precipitation: getVal(h.precipitation, hourIdx, 0),
-                humidity: getVal(h.relative_humidity_2m, hourIdx, 0),
-                alt: loc.alt,
-                isDay: getVal(h.is_day, hourIdx, 1)
-            });
-
-            let iconName = "check-circle-2";
-            if(analysis.status === "CAUTION") iconName = "alert-triangle";
-            if(analysis.status === "NO-GO") iconName = "ban";
-
-            return `
-                <div class="glass-card rounded-[2.5rem] overflow-hidden flex flex-col h-full group hover:scale-[1.01] transition-transform duration-500">
+            const loc = resort.locations[idx];
+            const analysis = analyzeWeather(locData.hourly, locData.daily, selectedDay, loc.alt);
+            
+            html += `
+                <div class="glass-card rounded-3xl overflow-hidden">
                     
-                    <!-- Status Header with Traffic Light -->
+                    <!-- Header with Traffic Light -->
                     <div class="px-5 py-4 flex justify-between items-center bg-white/50 border-b border-current/5">
                         <div class="flex items-center gap-3">
-                            <div class="w-5 h-5 rounded-full ${analysis.lightColor} shadow-lg shadow-current/30 animate-pulse"></div>
-                            <span class="font-black text-sm ${analysis.statusColor}">${analysis.statusText}</span>
+                            <div class="w-4 h-4 rounded-full ${analysis.lightColor} shadow-lg animate-pulse"></div>
+                            <span class="font-bold ${analysis.statusColor}">${analysis.statusText}</span>
                         </div>
-                        <span class="font-mono dir-ltr text-xs font-bold opacity-60 bg-current/10 px-2.5 py-1 rounded-full">${loc.alt}</span>
+                        <span class="font-mono dir-ltr text-xs font-bold opacity-60 bg-current/10 px-2 py-1 rounded-full">${loc.alt}m</span>
                     </div>
-
+                    
                     <!-- Main Info -->
-                    <div class="p-5 text-center relative">
-                        <h3 class="text-base font-bold opacity-60 mb-2">${loc.name}</h3>
-                        <div class="flex justify-center items-end gap-1 leading-none mb-3">
-                            <span class="text-6xl font-black dir-ltr tracking-tighter text-current drop-shadow-sm">${mainTemp}°</span>
+                    <div class="p-5 text-center">
+                        <h3 class="font-bold opacity-60 mb-2">${loc.name}</h3>
+                        <div class="text-6xl font-black dir-ltr mb-2">${analysis.temp}°</div>
+                        <div class="flex justify-center gap-3 text-sm opacity-50 dir-ltr mb-3">
+                            <span>↓${analysis.tempMin}°</span>
+                            <span>↑${analysis.tempMax}°</span>
                         </div>
-                        <div class="flex justify-center gap-4 text-sm font-bold opacity-50 dir-ltr mb-3">
-                            <span>L: ${Math.round(daily.temperature_2m_min[selectedDayIndex])}°</span>
-                            <span class="w-px h-4 bg-current/20"></span>
-                            <span>H: ${Math.round(daily.temperature_2m_max[selectedDayIndex])}°</span>
-                        </div>
-                        <div class="inline-flex items-center gap-2 bg-current/5 px-3 py-1.5 rounded-lg text-sm font-bold opacity-80">
+                        <div class="inline-flex items-center gap-2 bg-current/5 px-3 py-1.5 rounded-lg text-sm">
                             <i data-lucide="thermometer" class="w-4 h-4"></i>
-                            <span>Real Feel: <span class="dir-ltr">${analysis.realFeel}°</span></span>
-                        </div>
-                        ${analysis.uv.val > 6 ? `<div class="mt-2 text-xs text-red-500 font-bold animate-pulse">⚠️ خطر UV بالا!</div>` : ''}
-                    </div>
-
-                    <!-- Basic Stats Grid -->
-                    <div class="grid grid-cols-4 gap-px bg-current/5 border-y border-current/5">
-                        <div class="bg-white/40 p-3 flex flex-col items-center gap-1">
-                            <i data-lucide="wind" class="w-4 h-4 opacity-50"></i>
-                            <span class="text-lg font-black dir-ltr text-blue-600">${analysis.wind.val}</span>
-                            <span class="text-xs opacity-60">باد</span>
-                        </div>
-                        <div class="bg-white/40 p-3 flex flex-col items-center gap-1">
-                            <i data-lucide="eye" class="w-4 h-4 opacity-50"></i>
-                            <span class="text-lg font-black dir-ltr">${analysis.visibility.val}</span>
-                            <span class="text-xs opacity-60">دید</span>
-                        </div>
-                        <div class="bg-white/40 p-3 flex flex-col items-center gap-1">
-                            <i data-lucide="droplets" class="w-4 h-4 opacity-50"></i>
-                            <span class="text-lg font-black dir-ltr text-cyan-600">${analysis.humidity.val}%</span>
-                            <span class="text-xs opacity-60">رطوبت</span>
-                        </div>
-                        <div class="bg-white/40 p-3 flex flex-col items-center gap-1">
-                            <i data-lucide="cloud" class="w-4 h-4 opacity-50"></i>
-                            <span class="text-lg font-black dir-ltr text-gray-600">${analysis.cloudCover.val}%</span>
-                            <span class="text-xs opacity-60">ابر</span>
+                            <span>احساس دما: <span class="dir-ltr font-bold">${analysis.windChill}°</span></span>
                         </div>
                     </div>
-
+                    
+                    <!-- Stats Grid -->
+                    <div class="grid grid-cols-4 gap-px bg-current/5 border-y border-current/5 text-center">
+                        <div class="bg-white/40 p-3">
+                            <i data-lucide="wind" class="w-4 h-4 mx-auto opacity-50 mb-1"></i>
+                            <div class="text-lg font-black dir-ltr text-blue-600">${analysis.wind}</div>
+                            <div class="text-xs opacity-60">km/h</div>
+                        </div>
+                        <div class="bg-white/40 p-3">
+                            <i data-lucide="eye" class="w-4 h-4 mx-auto opacity-50 mb-1"></i>
+                            <div class="text-lg font-black dir-ltr">${analysis.visibility}</div>
+                            <div class="text-xs opacity-60">km</div>
+                        </div>
+                        <div class="bg-white/40 p-3">
+                            <i data-lucide="droplets" class="w-4 h-4 mx-auto opacity-50 mb-1"></i>
+                            <div class="text-lg font-black dir-ltr text-cyan-600">${analysis.humidity}%</div>
+                            <div class="text-xs opacity-60">رطوبت</div>
+                        </div>
+                        <div class="bg-white/40 p-3">
+                            <i data-lucide="cloud" class="w-4 h-4 mx-auto opacity-50 mb-1"></i>
+                            <div class="text-lg font-black dir-ltr text-gray-600">${analysis.cloud}%</div>
+                            <div class="text-xs opacity-60">ابر</div>
+                        </div>
+                    </div>
+                    
                     <!-- Detailed Analysis -->
-                    <div class="p-4 space-y-3 flex-grow">
+                    <div class="p-4 space-y-3">
                         
-                        <!-- Wind Analysis -->
+                        <!-- Wind -->
                         <div class="bg-blue-50/50 rounded-xl p-3 flex items-center justify-between">
                             <div class="flex items-center gap-3">
                                 <div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
                                     <i data-lucide="wind" class="w-5 h-5 text-blue-600"></i>
                                 </div>
                                 <div>
-                                    <div class="text-sm font-bold text-blue-800">${analysis.wind.cond}</div>
-                                    <div class="text-xs opacity-60">${analysis.wind.lift}</div>
+                                    <div class="font-bold text-blue-800">${analysis.windStatus}</div>
+                                    <div class="text-xs opacity-60">${analysis.windLift}</div>
                                 </div>
                             </div>
                             <div class="text-left dir-ltr">
-                                <div class="text-base font-black text-blue-600">${analysis.wind.val} km/h</div>
-                                <div class="text-xs opacity-50">Gust: ${analysis.wind.gust}</div>
+                                <div class="text-lg font-black text-blue-600">${analysis.wind} km/h</div>
+                                <div class="text-xs opacity-50">Gust: ${analysis.windGust}</div>
                             </div>
                         </div>
-
-                        <!-- Lens Recommendation -->
+                        
+                        <!-- Lens -->
                         <div class="bg-amber-50/50 rounded-xl p-3 flex items-center justify-between">
                             <div class="flex items-center gap-3">
                                 <div class="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
                                     <i data-lucide="glasses" class="w-5 h-5 text-amber-600"></i>
                                 </div>
                                 <div>
-                                    <div class="text-sm font-bold text-amber-800">${analysis.lens.cond}</div>
-                                    <div class="text-xs opacity-60">${analysis.lens.rec}</div>
+                                    <div class="font-bold text-amber-800">لنز ${analysis.lens}</div>
+                                    <div class="text-xs opacity-60">UV: ${analysis.uv}</div>
                                 </div>
                             </div>
                             <div class="text-left">
-                                <div class="text-base font-black text-amber-600 dir-ltr">${analysis.lens.vlt}</div>
+                                <div class="text-lg font-black text-amber-600 dir-ltr">${analysis.lensVLT}</div>
                                 <div class="text-xs opacity-50">VLT</div>
                             </div>
                         </div>
-
+                        
                         <!-- Snow Quality -->
                         <div class="bg-teal-50/50 rounded-xl p-3 flex items-center justify-between">
                             <div class="flex items-center gap-3">
@@ -727,17 +636,17 @@
                                     <i data-lucide="snowflake" class="w-5 h-5 text-teal-600"></i>
                                 </div>
                                 <div>
-                                    <div class="text-sm font-bold text-teal-800">${analysis.surface.val}</div>
-                                    <div class="text-xs opacity-60">بارش: ${analysis.precipitation.val} mm</div>
+                                    <div class="font-bold text-teal-800">${analysis.snowQuality}</div>
+                                    <div class="text-xs opacity-60">برف ۲۴ ساعته: ${analysis.snowfall24h} cm</div>
                                 </div>
                             </div>
                             <div class="text-left dir-ltr">
-                                <div class="text-base font-black text-teal-600">${analysis.surface.freezeLvl}m</div>
-                                <div class="text-xs opacity-50">Freeze Lvl</div>
+                                <div class="text-lg font-black text-teal-600">${analysis.freezeLevel}m</div>
+                                <div class="text-xs opacity-50">صفر درجه</div>
                             </div>
                         </div>
-
-                        <!-- CAPE / Stability -->
+                        
+                        <!-- CAPE -->
                         <div class="bg-purple-50/50 rounded-xl p-3">
                             <div class="flex items-center justify-between mb-2">
                                 <div class="flex items-center gap-3">
@@ -745,455 +654,222 @@
                                         <i data-lucide="zap" class="w-5 h-5 text-purple-600"></i>
                                     </div>
                                     <div>
-                                        <div class="text-sm font-bold text-purple-800">${analysis.cape.cond}</div>
-                                        <div class="text-xs opacity-60">${analysis.cape.rec}</div>
+                                        <div class="font-bold text-purple-800">${analysis.capeStatus}</div>
+                                        <div class="text-xs opacity-60">CAPE: ${analysis.cape} J/kg</div>
                                     </div>
                                 </div>
                                 <div class="text-left dir-ltr">
-                                    <div class="text-base font-black text-purple-600">${analysis.cape.val}</div>
-                                    <div class="text-xs opacity-50">CAPE J/kg</div>
-                                </div>
-                            </div>
-                            <div class="bg-purple-100/50 rounded-lg px-3 py-1.5 text-center">
-                                <span class="text-xs font-bold text-purple-700">🎿 ${analysis.cape.skiResult}</span>
-                            </div>
-                        </div>
-
-                        <!-- Lifted Index -->
-                        <div class="bg-rose-50/50 rounded-xl p-3">
-                            <div class="flex items-center justify-between mb-2">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center">
-                                        <i data-lucide="arrow-up-down" class="w-5 h-5 text-rose-600"></i>
-                                    </div>
-                                    <div>
-                                        <div class="text-sm font-bold text-rose-800">${analysis.liftedIndex.cond}</div>
-                                        <div class="text-xs opacity-60">شاخص بلندشدگی</div>
-                                    </div>
-                                </div>
-                                <div class="text-left dir-ltr">
-                                    <div class="text-base font-black text-rose-600">${analysis.liftedIndex.val}°</div>
+                                    <div class="text-lg font-black text-purple-600">${analysis.li}°</div>
                                     <div class="text-xs opacity-50">LI</div>
                                 </div>
                             </div>
-                            <div class="bg-rose-100/50 rounded-lg px-3 py-1.5 text-center">
-                                <span class="text-xs font-bold text-rose-700">🎿 ${analysis.liftedIndex.skiResult}</span>
+                            <div class="bg-purple-100/50 rounded-lg px-3 py-1.5 text-center">
+                                <span class="text-xs font-bold text-purple-700">🎿 ${analysis.skiResult}</span>
                             </div>
                         </div>
+                        
+                        <!-- Avalanche -->
+                        <div class="bg-red-50/50 rounded-xl p-3 flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
+                                    <i data-lucide="triangle-alert" class="w-5 h-5 text-red-600"></i>
+                                </div>
+                                <div>
+                                    <div class="font-bold text-red-800">ریسک بهمن: ${analysis.avalancheRisk}</div>
+                                    <div class="text-xs opacity-60">فشار: ${analysis.pressure} hPa (${analysis.pressureStatus})</div>
+                                </div>
+                            </div>
+                        </div>
+                        
                     </div>
-
-                    <!-- Reasons Footer (if any) -->
+                    
+                    <!-- Reasons if any -->
                     ${analysis.reasons.length > 0 ? `
                     <div class="px-4 pb-4">
-                        <div class="bg-current/5 rounded-xl p-3 text-center">
-                            <div class="text-xs font-bold opacity-70">⚠️ ${analysis.reasons.join(' • ')}</div>
+                        <div class="${analysis.status === 'stop' ? 'bg-red-100 border border-red-200' : 'bg-amber-100 border border-amber-200'} rounded-xl p-3 text-center">
+                            <div class="flex items-center justify-center gap-2 mb-1">
+                                <span class="${analysis.status === 'stop' ? 'text-red-600' : 'text-amber-600'} text-lg">⚠️</span>
+                                <span class="${analysis.status === 'stop' ? 'text-red-800' : 'text-amber-800'} font-black text-sm">علت:</span>
+                            </div>
+                            <span class="${analysis.status === 'stop' ? 'text-red-700' : 'text-amber-700'} text-sm font-bold">${analysis.reasons.join(' • ')}</span>
                         </div>
                     </div>
                     ` : ''}
+                    
                 </div>
             `;
+        });
+        
+        container.innerHTML = html;
+        lucide.createIcons();
+    }
+    
+    // ============================================
+    // 7. ACTIONS
+    // ============================================
+    
+    async function loadResort(key) {
+        currentResort = key;
+        selectedDay = 0;
+        
+        // Clear snow prediction
+        document.getElementById('snow-prediction').innerHTML = '';
+        document.getElementById('snow-prediction').classList.add('hidden');
+        
+        // Update buttons
+        document.querySelectorAll('.resort-btn').forEach(btn => {
+            btn.classList.remove('accent-bg', 'text-white', 'shadow-lg');
+            btn.classList.add('opacity-70');
+        });
+        const activeBtn = document.getElementById(`btn-${key}`);
+        activeBtn.classList.add('accent-bg', 'text-white', 'shadow-lg');
+        activeBtn.classList.remove('opacity-70');
+        
+        // Show loading
+        document.getElementById('loading').classList.remove('hidden');
+        document.getElementById('loading').classList.add('flex');
+        document.getElementById('weather-cards').innerHTML = '';
+        
+        // Fetch data if not cached
+        if (!weatherCache[key]) {
+            const resort = RESORTS[key];
+            const promises = resort.locations.map(loc => fetchWeather(loc.lat, loc.lon));
+            weatherCache[key] = await Promise.all(promises);
         }
-
-        function openDetail(rKey, lIdx) {
-            const data = weatherStore[rKey][lIdx];
-            const h = data.hourly;
-            const hourIdx = (selectedDayIndex * 24) + 12;
-            const getVal = (arr, i, def) => (arr && arr[i] !== undefined) ? arr[i] : def;
-
-            const analysis = analyzeConditions({
-                temp: getVal(h.temperature_2m, hourIdx, 0),
-                wind: getVal(h.wind_speed_10m, hourIdx, 0),
-                windGust: getVal(h.wind_gusts_10m, hourIdx, 0),
-                vis: getVal(h.visibility, hourIdx, 10000),
-                cloud: getVal(h.cloud_cover, hourIdx, 0),
-                cape: getVal(h.cape, hourIdx, 0),
-                liftedIndex: getVal(h.lifted_index, hourIdx, 0),
-                freezeLvl: getVal(h.freezing_level_height, hourIdx, 3000),
-                uv: getVal(data.daily.uv_index_max, selectedDayIndex, 0),
-                precipitation: getVal(h.precipitation, hourIdx, 0),
-                humidity: getVal(h.relative_humidity_2m, hourIdx, 0),
-                alt: RESORTS[rKey].locations[lIdx].alt,
-                isDay: getVal(h.is_day, hourIdx, 1)
-            });
-
-            const modal = document.getElementById('hourly-modal');
-            const content = document.getElementById('modal-content');
-            document.getElementById('modal-title').innerText = RESORTS[rKey].locations[lIdx].name;
-            document.getElementById('modal-subtitle').innerText = `${analysis.statusText} - ${getPersianDate(selectedDayIndex).full}`;
-
-            content.innerHTML = `
-                <!-- Status Banner -->
-                <div class="${analysis.statusColor} p-6 rounded-3xl flex items-start gap-4 shadow-sm">
-                    <div class="p-3 bg-white/50 rounded-full shadow-sm"><i data-lucide="${analysis.status === 'GO' ? 'check' : 'alert-triangle'}" class="w-8 h-8"></i></div>
-                    <div>
-                        <h3 class="text-xl font-black mb-2">${analysis.statusText}</h3>
-                        <p class="text-sm opacity-90 leading-relaxed font-medium">
-                            ${analysis.reasons.length > 0 ? 'علت: ' + analysis.reasons.join(' + ') : 'تمامی شاخص‌های جوی برای اسکی مساعد هستند.'}
-                        </p>
-                    </div>
-                </div>
-
-                <!-- Analysis Grid -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    
-                    <!-- Wind -->
-                    <div class="glass-card p-5 rounded-3xl border-0 bg-blue-50/50">
-                        <div class="flex justify-between mb-3 items-start">
-                            <div>
-                                <strong class="text-blue-800 flex items-center gap-2 text-sm mb-1"><i data-lucide="wind" class="w-4 h-4"></i> وضعیت باد</strong>
-                                <p class="text-sm font-bold text-blue-900">${analysis.wind.cond}</p>
-                            </div>
-                            <div class="text-right">
-                                <div class="dir-ltr font-black text-2xl text-blue-600">${analysis.wind.val}</div>
-                                <div class="text-[10px] opacity-60 dir-ltr">Gust: ${analysis.wind.gust} km/h</div>
-                            </div>
-                        </div>
-                        <p class="text-xs text-blue-800/70 leading-relaxed mb-3">${analysis.wind.rec}</p>
-                        <div class="bg-white/60 px-3 py-1.5 rounded-lg text-xs text-blue-900 font-bold inline-block shadow-sm">
-                            ${analysis.wind.lift}
-                        </div>
-                    </div>
-
-                    <!-- Visibility -->
-                    <div class="glass-card p-5 rounded-3xl border-0 bg-slate-50/50">
-                        <div class="flex justify-between mb-3 items-start">
-                            <div>
-                                <strong class="text-slate-800 flex items-center gap-2 text-sm mb-1"><i data-lucide="eye" class="w-4 h-4"></i> دید و ابر</strong>
-                                <p class="text-sm font-bold text-slate-900">${analysis.visibility.cond}</p>
-                            </div>
-                            <div class="text-right">
-                                <div class="dir-ltr font-black text-2xl text-slate-600">${analysis.visibility.val}</div>
-                                <div class="text-[10px] opacity-60">کیلومتر</div>
-                            </div>
-                        </div>
-                        <div class="flex gap-4 text-xs">
-                            <div class="flex-1 bg-white/60 p-2 rounded-lg">
-                                <div class="opacity-60 mb-1">پوشش ابر</div>
-                                <div class="font-black dir-ltr">${analysis.cloudCover.val}%</div>
-                            </div>
-                            <div class="flex-1 bg-white/60 p-2 rounded-lg">
-                                <div class="opacity-60 mb-1">رطوبت</div>
-                                <div class="font-black dir-ltr">${analysis.humidity.val}%</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Lens/Light -->
-                    <div class="glass-card p-5 rounded-3xl border-0 bg-amber-50/50">
-                        <div class="flex justify-between mb-3 items-start">
-                            <div>
-                                <strong class="text-amber-800 flex items-center gap-2 text-sm mb-1"><i data-lucide="glasses" class="w-4 h-4"></i> لنز پیشنهادی</strong>
-                                <p class="text-sm font-bold text-amber-900">${analysis.lens.cond}</p>
-                            </div>
-                            <div class="text-right">
-                                <div class="dir-ltr font-black text-2xl text-amber-600">${analysis.lens.vlt.replace('%','')}</div>
-                                <div class="text-[10px] opacity-60">VLT</div>
-                            </div>
-                        </div>
-                        <p class="text-xs text-amber-800/70 leading-relaxed mb-2">پیشنهاد: ${analysis.lens.rec}</p>
-                        ${analysis.uv.val > 6 ? `<div class="mt-2 text-xs text-red-600 font-bold bg-red-100/50 px-2 py-1 rounded inline-block">UV Index: ${analysis.uv.val} (بالا)</div>` : ''}
-                    </div>
-
-                    <!-- Surface/Snow -->
-                    <div class="glass-card p-5 rounded-3xl border-0 bg-teal-50/50">
-                        <div class="flex justify-between mb-3 items-start">
-                            <div>
-                                <strong class="text-teal-800 flex items-center gap-2 text-sm mb-1"><i data-lucide="snowflake" class="w-4 h-4"></i> کیفیت برف</strong>
-                                <p class="text-sm font-bold text-teal-900">${analysis.surface.val}</p>
-                            </div>
-                            <div class="text-right">
-                                <div class="dir-ltr font-black text-xl text-teal-600">${analysis.surface.freezeLvl}m</div>
-                                <div class="text-[10px] opacity-60">Freezing Lvl</div>
-                            </div>
-                        </div>
-                        <div class="text-xs text-teal-800/70 leading-relaxed">
-                            <div class="mb-1">بارش: <span class="font-bold dir-ltr">${analysis.precipitation.val} mm</span></div>
-                            <div>ارتفاع انجماد تعیین می‌کند برف در چه ارتفاعی ذوب می‌شود.</div>
-                        </div>
-                    </div>
-
-                    <!-- CAPE/Stability -->
-                    <div class="glass-card p-5 rounded-3xl border-0 bg-purple-50/50">
-                        <div class="flex justify-between mb-3 items-start">
-                            <div>
-                                <strong class="text-purple-800 flex items-center gap-2 text-sm mb-1"><i data-lucide="zap" class="w-4 h-4"></i> پایداری جو (CAPE)</strong>
-                                <p class="text-sm font-bold text-purple-900">${analysis.cape.cond}</p>
-                            </div>
-                            <div class="text-right">
-                                <div class="dir-ltr font-black text-2xl text-purple-600">${analysis.cape.val}</div>
-                                <div class="text-[10px] opacity-60">J/kg</div>
-                            </div>
-                        </div>
-                        <p class="text-xs text-purple-800/70 leading-relaxed">${analysis.cape.rec}</p>
-                    </div>
-                    
-                    <!-- Lifted Index -->
-                    <div class="glass-card p-5 rounded-3xl border-0 bg-rose-50/50">
-                        <div class="flex justify-between mb-3 items-start">
-                            <div>
-                                <strong class="text-rose-800 flex items-center gap-2 text-sm mb-1"><i data-lucide="arrow-up-down" class="w-4 h-4"></i> شاخص بلندشدگی (LI)</strong>
-                                <p class="text-sm font-bold text-rose-900">${analysis.liftedIndex.cond}</p>
-                            </div>
-                            <div class="text-right">
-                                <div class="dir-ltr font-black text-2xl text-rose-600">${analysis.liftedIndex.val}</div>
-                                <div class="text-[10px] opacity-60">°C</div>
-                            </div>
-                        </div>
-                        <p class="text-xs text-rose-800/70 leading-relaxed">مقدار کمتر = جو ناپایدارتر. مقدار منفی نشان‌دهنده احتمال رعدوبرق است.</p>
-                    </div>
-                </div>
-            `;
+        
+        // Hide loading
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('loading').classList.remove('flex');
+        
+        // Render
+        renderDateSelector();
+        renderWeatherCards();
+    }
+    
+    function selectDay(day) {
+        selectedDay = day;
+        renderDateSelector();
+        renderWeatherCards();
+    }
+    
+    function findSnowDay() {
+        const container = document.getElementById('snow-prediction');
+        container.innerHTML = `
+            <div class="glass-card p-6 rounded-2xl text-center">
+                <i data-lucide="loader-2" class="w-8 h-8 animate-spin mx-auto opacity-50"></i>
+                <p class="mt-3 font-bold opacity-60">در حال جستجو...</p>
+            </div>
+        `;
+        container.classList.remove('hidden');
+        lucide.createIcons();
+        
+        setTimeout(() => {
+            const data = weatherCache[currentResort];
+            if (!data) return;
             
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-            lucide.createIcons();
-        }
-
-        // --- 5. Utilities & Helpers ---
-
-        function closeModal(e) {
-            if (e && e.target.id !== 'hourly-modal' && !e.target.closest('button')) return;
-            const m = document.getElementById('hourly-modal');
-            m.classList.add('hidden');
-            m.classList.remove('flex');
-        }
-
-        function renderDateSelector() {
-            const container = document.getElementById('date-selector-list');
-            container.innerHTML = '';
-            for(let i=0; i<16; i++) {
-                const d = getPersianDate(i);
-                const active = i === selectedDayIndex;
-                container.innerHTML += `
-                    <button onclick="setDate(${i})" class="flex flex-col items-center justify-center px-5 py-3 rounded-2xl min-w-[95px] transition-all duration-300 ${active ? 'accent-bg text-white shadow-lg scale-105 font-bold' : 'bg-white/30 hover:bg-white/50'}">
-                        <span class="text-xs opacity-80 mb-1">${d.day}</span>
-                        <span class="whitespace-nowrap text-sm">${d.full}</span>
-                    </button>
+            let bestDay = null;
+            let maxSnow = 0;
+            let snowData = [];
+            
+            for (let day = 0; day < 16; day++) {
+                let totalSnow = 0;
+                const dayData = [];
+                
+                data.forEach((locData, idx) => {
+                    const snow = locData?.daily?.snowfall_sum?.[day] || 0;
+                    const prob = locData?.daily?.precipitation_probability_max?.[day] || 0;
+                    totalSnow += snow;
+                    dayData.push({ idx, snow, prob });
+                });
+                
+                if (totalSnow > maxSnow) {
+                    maxSnow = totalSnow;
+                    bestDay = day;
+                    snowData = dayData;
+                }
+            }
+            
+            if (bestDay !== null && maxSnow > 0) {
+                // Use API dates
+                const dateStr = data[0]?.daily?.time?.[bestDay];
+                const date = dateStr ? parseApiDate(dateStr) : new Date();
+                
+                const label = getDayLabel(bestDay, date);
+                const persianDate = formatPersianDate(date);
+                const resort = RESORTS[currentResort];
+                
+                container.innerHTML = `
+                    <div class="glass-card p-5 rounded-2xl bg-gradient-to-l from-sky-400 to-sky-500 text-white relative overflow-hidden">
+                        
+                        <!-- Snow Effect -->
+                        <div class="absolute inset-0 overflow-hidden pointer-events-none">
+                            <div class="snow-particle"></div>
+                            <div class="snow-particle"></div>
+                            <div class="snow-particle"></div>
+                            <div class="snow-particle"></div>
+                            <div class="snow-particle"></div>
+                            <div class="snow-particle"></div>
+                        </div>
+                        
+                        <div class="text-center mb-4 relative z-10">
+                            <p class="text-white/80 text-sm mb-1">🎉 روز برفی پیدا شد!</p>
+                            <h3 class="text-xl font-black">${label} - ${persianDate}</h3>
+                        </div>
+                        
+                        <div class="grid grid-cols-3 gap-3 relative z-10">
+                            ${snowData.map(item => {
+                                const loc = resort.locations[item.idx];
+                                const probColor = item.prob > 70 ? 'bg-green-400' : (item.prob > 40 ? 'bg-amber-400' : 'bg-gray-400');
+                                return `
+                                    <div class="bg-white/15 backdrop-blur-sm rounded-xl p-3 border border-white/25 text-center">
+                                        <div class="font-bold text-sm mb-1">${loc.name}</div>
+                                        <div class="text-xs opacity-70 mb-2">${loc.alt}m</div>
+                                        <div class="bg-white rounded-lg py-2 mb-2">
+                                            <span class="text-2xl font-black text-sky-600">${Math.round(item.snow)}</span>
+                                            <span class="text-xs text-gray-600 block">سانتی</span>
+                                        </div>
+                                        <div class="${probColor} text-white px-2 py-0.5 rounded-full text-xs font-bold inline-block">${item.prob}%</div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            } else {
+                container.innerHTML = `
+                    <div class="glass-card p-5 rounded-2xl bg-orange-100 text-center">
+                        <p class="text-orange-800 font-bold">تا ۱۶ روز آینده برف سنگینی نداریم!</p>
+                        <p class="text-sm opacity-60 mt-1">زمان خوبی برای پیست کوبیده است.</p>
+                    </div>
                 `;
             }
-            document.getElementById('date-selector-container').classList.remove('hidden');
-        }
-
-        function setDate(i) {
-            selectedDayIndex = i;
-            renderDateSelector();
-            loadCards(currentSelection);
-        }
-
-        function setTheme(t) {
-            document.body.className = `${t} flex flex-col`;
-            localStorage.setItem('theme', t);
-        }
-
-        function askWhenSnow() {
-            const res = document.getElementById('prediction-result');
-            res.innerHTML = '<div class="glass-card p-6 rounded-3xl flex flex-col items-center gap-3"><i data-lucide="loader-2" class="animate-spin w-8 h-8 accent-text"></i><span class="text-sm font-bold opacity-60">در حال جستجوی پودر...</span></div>';
-            res.classList.remove('hidden');
-            lucide.createIcons();
-
-            setTimeout(() => {
-                const data = weatherStore[currentSelection];
-                if(!data) return;
-                
-                let bestDay = null;
-                let maxSnow = 0;
-                let snowByLocation = [];
-
-                for (let dayIdx = 0; dayIdx < 16; dayIdx++) {
-                    let dayTotal = 0;
-                    let dayData = [];
-                    
-                    data.forEach((locData, locIdx) => {
-                        const snow = locData.daily.snowfall_sum[dayIdx] || 0;
-                        const prob = locData.daily.precipitation_probability_max[dayIdx] || 0;
-                        dayTotal += snow;
-                        dayData.push({ locIdx, snow, prob });
-                    });
-                    
-                    if (dayTotal > maxSnow) {
-                        maxSnow = dayTotal;
-                        bestDay = dayIdx;
-                        snowByLocation = dayData;
-                    }
-                }
-
-                const res = document.getElementById('prediction-result');
-
-                if (bestDay !== null && maxSnow > 0) {
-                    const d = getPersianDate(bestDay);
-                    const resort = RESORTS[currentSelection];
-
-                    res.innerHTML = `
-                        <div class="glass-card p-5 rounded-[2rem] bg-gradient-to-l from-sky-400 to-sky-500 text-white shadow-xl relative overflow-hidden">
-                            
-                            <!-- Snow Effect -->
-                            <div class="absolute inset-0 overflow-hidden pointer-events-none">
-                                <div class="snow-particle"></div>
-                                <div class="snow-particle"></div>
-                                <div class="snow-particle"></div>
-                                <div class="snow-particle"></div>
-                                <div class="snow-particle"></div>
-                                <div class="snow-particle"></div>
-                            </div>
-                            
-                            <!-- Title Section - Centered at Top -->
-                            <div class="text-center mb-5 relative z-10">
-                                <p class="text-white/80 font-bold text-xs mb-1">🎉 یک روز برفی پیدا شد!</p>
-                                <h3 class="text-xl font-black">${d.day} - ${d.full}</h3>
-                            </div>
-
-                            <!-- Locations Grid -->
-                            <div class="grid grid-cols-3 gap-3 w-full relative z-10">
-                                ${snowByLocation.map(item => {
-                                    const loc = resort.locations[item.locIdx];
-                                    let probColor = 'bg-gray-400';
-                                    if (item.prob > 70) probColor = 'bg-green-400';
-                                    else if (item.prob > 40) probColor = 'bg-amber-400';
-                                    
-                                    return `
-                                        <div class="bg-white/15 backdrop-blur-sm rounded-xl p-3 border border-white/25 flex flex-col items-center gap-2">
-                                            <div class="text-center">
-                                                <div class="font-bold text-xs mb-0.5">${loc.name}</div>
-                                                <div class="text-[9px] opacity-70 font-mono dir-ltr">${loc.alt}</div>
-                                            </div>
-                                            <div class="bg-white rounded-lg px-3 py-2 text-center">
-                                                <div class="text-2xl font-black text-sky-600 dir-ltr">${Math.round(item.snow)}</div>
-                                                <div class="text-[9px] text-gray-600 font-bold">سانتی</div>
-                                            </div>
-                                            <div class="${probColor} text-white px-2 py-0.5 rounded-full text-[9px] font-bold">
-                                                ${item.prob}%
-                                            </div>
-                                        </div>
-                                    `;
-                                }).join('')}
-                            </div>
-                        </div>
-                    `;
-                } else {
-                    res.innerHTML = `
-                        <div class="mt-4 p-5 rounded-3xl bg-orange-100 border border-orange-200 text-center">
-                            <p class="text-orange-800 font-bold text-sm">تا ۱۶ روز آینده برف سنگینی نداریم!</p>
-                            <p class="text-xs opacity-60 mt-1">زمان مناسبی برای پیست کوبیده است.</p>
-                        </div>
-                    `;
-                }
-                
-                lucide.createIcons();
-            }, 1200);
-        }
-
-        // Show Guides Modal
-        function showGuides() {
-            const modal = document.getElementById('hourly-modal');
-            const content = document.getElementById('modal-content');
-            document.getElementById('modal-title').innerText = 'راهنمای فنی و استانداردها';
-            document.getElementById('modal-subtitle').innerText = 'اطلاعات تخصصی برای اسکی‌بازان حرفه‌ای';
-
-            content.innerHTML = `
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <!-- Wind Table -->
-                    <div class="glass-card p-6 rounded-[2rem] relative overflow-hidden group hover:shadow-lg transition-all duration-500">
-                        <div class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-400 to-cyan-500"></div>
-                        <h3 class="font-bold text-lg mb-6 flex items-center gap-2 text-blue-900">
-                            <i data-lucide="wind" class="w-5 h-5 text-blue-500"></i>
-                            استاندارد باد و لیفت
-                        </h3>
-                        <div class="space-y-3 text-xs opacity-90 max-h-[400px] overflow-y-auto pr-2">
-                            <div class="p-3 rounded-xl bg-green-50/50 border border-green-100">
-                                <div class="flex justify-between font-black text-green-700 mb-1"><span class="dir-ltr">0-20 km/h</span><span>ایده‌آل</span></div>
-                                <p class="opacity-70 leading-relaxed">شرایط عالی. تمام لیفت‌ها باز.</p>
-                            </div>
-                             <div class="p-3 rounded-xl bg-blue-50/50 border border-blue-100">
-                                <div class="flex justify-between font-black text-blue-700 mb-1"><span class="dir-ltr">20-30 km/h</span><span>محسوس</span></div>
-                                <p class="opacity-70 leading-relaxed">برف کمی جابجا می‌شود (Wind-drift). لیفت‌ها باز.</p>
-                            </div>
-                            <div class="p-3 rounded-xl bg-yellow-50/50 border border-yellow-100">
-                                <div class="flex justify-between font-black text-yellow-700 mb-1"><span class="dir-ltr">30-40 km/h</span><span>مشکل لبه‌گیری</span></div>
-                                <p class="opacity-70 leading-relaxed">یخ‌زایی سطحی. کاهش دید. احتمال محدودیت لیفت.</p>
-                            </div>
-                            <div class="p-3 rounded-xl bg-orange-50/50 border border-orange-100">
-                                <div class="flex justify-between font-black text-orange-700 mb-1"><span class="dir-ltr">40-60 km/h</span><span>ریسک بالا</span></div>
-                                <p class="opacity-70 leading-relaxed">تله‌سیژها غالباً بسته. برف سفت/یخ‌زده. Whiteout.</p>
-                            </div>
-                            <div class="p-3 rounded-xl bg-red-50/50 border border-red-100">
-                                <div class="flex justify-between font-black text-red-700 mb-1"><span class="dir-ltr">60+ km/h</span><span>طوفان</span></div>
-                                <p class="opacity-70 leading-relaxed">تعطیلی کامل پیست. دید نزدیک صفر.</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- CAPE Guide -->
-                    <div class="glass-card p-6 rounded-[2rem] relative overflow-hidden group hover:shadow-lg transition-all duration-500">
-                        <div class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-purple-400 to-pink-600"></div>
-                        <h3 class="font-bold text-lg mb-6 flex items-center gap-2 text-purple-900">
-                            <i data-lucide="zap" class="w-5 h-5 text-purple-500"></i>
-                            ناپایداری جو (CAPE)
-                        </h3>
-                         <div class="space-y-3 text-xs opacity-90 max-h-[400px] overflow-y-auto pr-2">
-                            <div class="p-3 rounded-xl bg-green-50/50 border border-green-100">
-                                <div class="flex justify-between font-black text-green-700 mb-1"><span class="dir-ltr">0</span><span>پایدار</span></div>
-                                <p class="opacity-70">بهترین زمان؛ رعدوبرق ≈ صفر</p>
-                            </div>
-                             <div class="p-3 rounded-xl bg-teal-50/50 border border-teal-100">
-                                <div class="flex justify-between font-black text-teal-700 mb-1"><span class="dir-ltr">1-500</span><span>ناپایداری کم</span></div>
-                                <p class="opacity-70">تغییرات محلی کوچک یا رگبار پراکنده.</p>
-                            </div>
-                             <div class="p-3 rounded-xl bg-orange-50/50 border border-orange-100">
-                                <div class="flex justify-between font-black text-orange-700 mb-1"><span class="dir-ltr">500-1000</span><span>رعدوبرق پراکنده</span></div>
-                                <p class="opacity-70">احتیاط؛ احتمال وزش باد ناگهانی (Gust).</p>
-                            </div>
-                             <div class="p-3 rounded-xl bg-red-50/50 border border-red-100">
-                                <div class="flex justify-between font-black text-red-700 mb-1"><span class="dir-ltr">1000+</span><span>توفان خطرناک</span></div>
-                                <p class="opacity-70">خطر صاعقه بالا. ارتفاعات نروید.</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Lens Guide -->
-                    <div class="glass-card p-6 rounded-[2rem] relative overflow-hidden group hover:shadow-lg transition-all duration-500">
-                        <div class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-orange-400 to-amber-500"></div>
-                        <h3 class="font-bold text-lg mb-6 flex items-center gap-2 text-amber-900">
-                            <i data-lucide="glasses" class="w-5 h-5 text-amber-500"></i>
-                            راهنمای انتخاب لنز
-                        </h3>
-                        <div class="space-y-3 text-xs opacity-90 max-h-[400px] overflow-y-auto pr-2">
-                            <div class="p-3 rounded-xl bg-gray-100/50 border border-gray-200">
-                                <div class="flex justify-between font-black text-gray-700 mb-1"><span>آفتابی شدید</span><span class="dir-ltr">5-10%</span></div>
-                                <p class="opacity-70">لنز تیره/آینه‌ای. کاهش خیرگی.</p>
-                            </div>
-                            <div class="p-3 rounded-xl bg-amber-50/50 border border-amber-100">
-                                <div class="flex justify-between font-black text-amber-700 mb-1"><span>آفتابی متوسط</span><span class="dir-ltr">10-25%</span></div>
-                                <p class="opacity-70">لنز قهوه‌ای/برنزی. تشخیص عمق.</p>
-                            </div>
-                            <div class="p-3 rounded-xl bg-orange-50/50 border border-orange-100">
-                                <div class="flex justify-between font-black text-orange-700 mb-1"><span>متغیر / نیمه‌ابری</span><span class="dir-ltr">18-35%</span></div>
-                                <p class="opacity-70">لنز نارنجی/رز. تقویت سایه‌ها.</p>
-                            </div>
-                             <div class="p-3 rounded-xl bg-rose-50/50 border border-rose-100">
-                                <div class="flex justify-between font-black text-rose-700 mb-1"><span>نور تخت (Flat)</span><span class="dir-ltr">35-60%</span></div>
-                                <p class="opacity-70">لنز صورتی/زرد روشن. آشکارسازی پستی بلندی.</p>
-                            </div>
-                            <div class="p-3 rounded-xl bg-yellow-50/50 border border-yellow-100">
-                                <div class="flex justify-between font-black text-yellow-700 mb-1"><span>مه / Whiteout</span><span class="dir-ltr">50-80%</span></div>
-                                <p class="opacity-70">لنز زرد قوی. حداکثر کنتراست.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-            lucide.createIcons();
-        }
-
-        // Init
-        window.addEventListener('DOMContentLoaded', () => {
-            const savedTheme = localStorage.getItem('theme') || 'theme-snow';
-            setTheme(savedTheme);
-            loadResort('tochal');
-            lucide.createIcons();
-        });
+        }, 1000);
+    }
+    
+    function setTheme(theme) {
+        document.body.className = `${theme} flex flex-col`;
+        localStorage.setItem('theme', theme);
+    }
+    
+    // ============================================
+    // 8. INIT
+    // ============================================
+    
+    window.addEventListener('DOMContentLoaded', () => {
+        // Theme
+        const savedTheme = localStorage.getItem('theme') || 'theme-snow';
+        setTheme(savedTheme);
+        
+        // Clock
+        updateClock();
+        setInterval(updateClock, 1000);
+        
+        // Load default resort
+        loadResort('tochal');
+        
+        // Init icons
+        lucide.createIcons();
+    });
     </script>
 </body>
 </html>
