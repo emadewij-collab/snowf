@@ -1,0 +1,13 @@
+{
+  "name": "snowf",
+  "version": "3.0.0",
+  "description": "SnowF — Ski Decision Assistant for Iranian ski resorts (static, no backend)",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,61 @@
+/* SnowF — Themes (all components use these CSS variables) */
+
+.theme-snow {
+  --bg-main: #f0f9ff;
+  --bg-gradient: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  --bg-card: rgba(255, 255, 255, 0.85);
+  --bg-soft: rgba(255, 255, 255, 0.55);
+  --text-primary: #0f172a;
+  --text-muted: #475569;
+  --accent: #0ea5e9;
+  --accent-contrast: #ffffff;
+  --border: #e0f2fe;
+  --card-shadow: 0 10px 30px -10px rgba(14, 165, 233, 0.15);
+  --ok: #16a34a; --warn: #d97706; --bad: #dc2626;
+  --ok-bg: #dcfce7; --warn-bg: #fef3c7; --bad-bg: #fee2e2;
+}
+
+.theme-sun {
+  --bg-main: #fffbeb;
+  --bg-gradient: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  --bg-card: rgba(255, 255, 255, 0.9);
+  --bg-soft: rgba(255, 255, 255, 0.6);
+  --text-primary: #451a03;
+  --text-muted: #78350f;
+  --accent: #f59e0b;
+  --accent-contrast: #ffffff;
+  --border: #fef3c7;
+  --card-shadow: 0 10px 30px -10px rgba(245, 158, 11, 0.15);
+  --ok: #15803d; --warn: #b45309; --bad: #b91c1c;
+  --ok-bg: #dcfce7; --warn-bg: #fef3c7; --bad-bg: #fee2e2;
+}
+
+.theme-night {
+  --bg-main: #0f172a;
+  --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  --bg-card: rgba(30, 41, 59, 0.8);
+  --bg-soft: rgba(30, 41, 59, 0.55);
+  --text-primary: #f8fafc;
+  --text-muted: #94a3b8;
+  --accent: #818cf8;
+  --accent-contrast: #ffffff;
+  --border: #334155;
+  --card-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+  --ok: #4ade80; --warn: #fbbf24; --bad: #f87171;
+  --ok-bg: rgba(34, 197, 94, 0.15); --warn-bg: rgba(245, 158, 11, 0.15); --bad-bg: rgba(239, 68, 68, 0.15);
+}
+
+.theme-aurora {
+  --bg-main: #0a0a1a;
+  --bg-gradient: linear-gradient(135deg, #1a0033 0%, #0a1a4d 50%, #002a5a 100%);
+  --bg-card: rgba(20, 10, 50, 0.7);
+  --bg-soft: rgba(20, 10, 50, 0.5);
+  --text-primary: #e0e7ff;
+  --text-muted: #a5b4fc;
+  --accent: #a855f7;
+  --accent-contrast: #ffffff;
+  --border: #4c1d95;
+  --card-shadow: 0 10px 30px -10px rgba(139, 92, 246, 0.3);
+  --ok: #4ade80; --warn: #fbbf24; --bad: #f87171;
+  --ok-bg: rgba(34, 197, 94, 0.15); --warn-bg: rgba(245, 158, 11, 0.15); --bad-bg: rgba(239, 68, 68, 0.15);
+}

@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: ["main"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: JS syntax check
+        run: |
+          for f in js/*.js service-worker.js; do node --check "$f" || exit 1; done
+      - name: Unit tests
+        run: node --test tests/
+      - name: JSON validation
+        run: |
+          node -e "JSON.parse(require('fs').readFileSync('data/resorts.json','utf8')); JSON.parse(require('fs').readFileSync('manifest.json','utf8')); console.log('JSON OK')"
