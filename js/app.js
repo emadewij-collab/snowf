@@ -708,9 +708,15 @@ function registerSW() {
   if (!('serviceWorker' in navigator)) return;
   const isLocal = ['localhost', '127.0.0.1'].includes(location.hostname);
   if (!window.isSecureContext && !isLocal) return;
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./service-worker.js').catch(() => {});
-  });
+  const go = () => {
+    navigator.serviceWorker.register('./service-worker.js').catch((e) => {
+      console.warn('SW registration failed:', e);
+    });
+  };
+  // Race guard: boot() awaits API calls, so the window 'load' event may have
+  // already fired by the time we register the listener.
+  if (document.readyState === 'complete') go();
+  else window.addEventListener('load', go, { once: true });
 }
 
 // Debug handle (factors etc. inspectable from console).
