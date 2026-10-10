@@ -25,7 +25,8 @@ export function faNum(v, decimals = null) {
 export const fmtTemp = (v) => (v === null || v === undefined ? '—' : `${faNum(Math.round(v))}°`);
 export const fmtKmh = (v) => (v === null || v === undefined ? '—' : `${faNum(Math.round(v))} km/h`);
 export const fmtCm = (v) => (v === null || v === undefined ? '—' : `${faNum(Math.round(v))} cm`);
-export const fmtKm = (v) => (v === null || v === undefined ? '—' : `${faNum(v, 1)} km`);
+// Visibility is a model estimate — don't imply false precision (41.9 → ۴۲).
+export const fmtKm = (v) => (v === null || v === undefined ? '—' : `${faNum(Math.round(v))} km`);
 export const fmtPct = (v) => (v === null || v === undefined ? '—' : `${faNum(Math.round(v))}٪`);
 
 export function parseDay(dateStr) {
@@ -102,21 +103,38 @@ export function refreshIcons() {
 // ---------------------------------------------------------------- hero
 export function renderHero(ranked = [], { dateLabel = '', profileLabel = '', stale = false } = {}) {
   if (!ranked.length) {
-    return `<div class="banner banner-bad">⚠️ داده‌ای برای رتبه‌بندی پیست‌ها موجود نیست.</div>`;
+    return `<div class="banner banner-bad">⚠️ داده‌ای برای بررسی پیست‌ها موجود نیست.</div>`;
   }
   const top = ranked[0];
   const v = top.verdict || { verdict: 'caution' };
+  const allAvoid = ranked.every((r) => (r.verdict?.verdict || 'avoid') === 'avoid');
   const rows = ranked
-    .map(
-      (r) => `
-      <button class="rank-row ${r.rank === 1 ? 'top' : ''}" data-action="goto-resort" data-resort="${esc(r.resortId)}" aria-label="نمایش ${esc(r.nameFa)}">
-        <span class="text-xl">${r.medal}</span>
+    .map((r) => {
+      const safetyWarn = isNum(r.safety) && r.safety < 65 ? ' <span title="ایمنی نیازمند احتیاط">⚠️</span>' : '';
+      return `
+      <button class="rank-row ${!allAvoid && r.rank === 1 ? 'top' : ''}" data-action="goto-resort" data-resort="${esc(r.resortId)}" aria-label="نمایش ${esc(r.nameFa)}">
+        <span class="text-xl">${allAvoid ? '❄️' : r.medal}</span>
         <span class="font-black flex-1">${esc(r.nameFa)}</span>
-        <span class="text-xs opacity-70 tnum">🎿 ${faNum(r.ski)} • 🛡 ${faNum(r.safety)}</span>
+        <span class="text-xs opacity-70 tnum">🎿 ${faNum(r.ski)} • 🛡 ${faNum(r.safety)}${safetyWarn}</span>
         <span class="text-lg">${(VERDICTS[r.verdict.verdict] || {}).icon || ''}</span>
-      </button>`
-    )
+      </button>`;
+    })
     .join('');
+
+  // #11: when NO resort is a good option, never promote the "least bad" one.
+  if (allAvoid) {
+    const reasons = (top.verdict?.reasons || []).slice(0, 2).join(' • ');
+    return `
+    <div class="verdict-avoid rounded-2xl p-5 text-white">
+      <div class="text-2xl font-black">❄️ برای امروز هیچ پیست پیشنهاد نمی‌شود</div>
+      <div class="text-sm leading-6 opacity-95 mt-2">
+        ${esc(reasons || 'شرایط جوی مساعد نیست')}. رفتن توصیه نمی‌شود.
+        برای روزهای آینده دکمه‌ی «کی برف میاد؟» و پیش‌بینی چندروزه را ببینید.
+      </div>
+    </div>
+    <div class="flex flex-col gap-2 mt-3">${rows}</div>
+    <p class="meta-line mt-3 text-center">شاخص‌ها برآوردی‌اند و دقت علمی ندارند • ${esc(profileLabel)}</p>`;
+  }
 
   return `
     <div class="verdict-${v.verdict} rounded-2xl p-4 md:p-5 text-white mb-4">
@@ -128,13 +146,13 @@ export function renderHero(ranked = [], { dateLabel = '', profileLabel = '', sta
         </div>
         <div class="text-left bg-white/20 px-4 py-2 rounded-2xl">
           <div class="text-3xl font-black tnum">${faNum(top.blend)}</div>
-          <div class="text-xs opacity-80">امتیاز ترکیبی /۱۰۰</div>
+          <div class="text-xs opacity-80">شاخص اولویت /۱۰</div>
         </div>
       </div>
       <div class="grid grid-cols-3 gap-2 mt-4 text-center text-sm">
-        <div class="bg-white/15 rounded-xl p-2"><div class="text-xs opacity-80">🎿 کیفیت</div><div class="font-black tnum">${faNum(top.ski)}</div></div>
-        <div class="bg-white/15 rounded-xl p-2"><div class="text-xs opacity-80">🛡 ایمنی</div><div class="font-black tnum">${faNum(top.safety)}</div></div>
-        <div class="bg-white/15 rounded-xl p-2"><div class="text-xs opacity-80">❄️ برف</div><div class="font-black tnum">${faNum(top.snowScore)}</div></div>
+        <div class="bg-white/15 rounded-xl p-2"><div class="text-xs opacity-80">🎿 کیفیت اسکی</div><div class="font-black tnum">${faNum(top.ski)}</div></div>
+        <div class="bg-white/15 rounded-xl p-2"><div class="text-xs opacity-80">🛡 ایمنی</div><div class="font-black tnum">${faNum(top.safety)}${isNum(top.safety) && top.safety < 65 ? ' ⚠️' : ''}</div></div>
+        <div class="bg-white/15 rounded-xl p-2"><div class="text-xs opacity-80">❄️ کیفیت برف</div><div class="font-black tnum">${faNum(top.snowScore)}</div></div>
       </div>
       <div class="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-sm font-bold">
         <span>🌨️ تازه: ${fmtCm(top.fresh24hCm)}</span>
@@ -142,8 +160,10 @@ export function renderHero(ranked = [], { dateLabel = '', profileLabel = '', sta
         <span>👁️ دید: ${fmtKm(top.visKm)}</span>
         ${top.windowLabel ? `<span>⏰ ${esc(top.windowLabel)}</span>` : ''}
       </div>
-      ${v.safetyGate ? `<div class="mt-3 text-sm font-bold bg-black/25 rounded-xl px-3 py-2">⚠️ با وجود کیفیت خوب، ایمنی محدودکننده است — جزئیات را ببین.</div>` : ''}
-      ${stale ? `<div class="mt-2 text-xs opacity-80">⚠️ بر اساس آخرین داده ذخیره‌شده</div>` : ''}
+      ${v.safetyGate ? `<div class="mt-3 text-sm font-bold bg-black/25 rounded-xl px-3 py-2">🛡 شاخص کیفیت خوب است، اما ایمنی اجازه‌ی «برو» نمی‌دهد — جزئیات را ببینید.</div>` : ''}
+      ${!v.safetyGate && isNum(top.safety) && top.safety < 65 ? `<div class="mt-3 text-sm font-bold bg-black/25 rounded-xl px-3 py-2">🛡 ایمنی: نیازمند احتیاط (${faNum(top.safety)}) — رتبه‌ی بالا به‌تنهایی تضمین ایمنی نیست.</div>` : ''}
+      ${stale ? `<div class="mt-2 text-xs opacity-80">⚠️ بر اساس آخرین داده‌ی ذخیره‌شده</div>` : ''}
+      <div class="mt-2 text-xs opacity-75">شاخص‌ها برآوردی‌اند؛ عدد دقیق به معنای دقت علمی نیست.</div>
     </div>
     <div class="flex flex-col gap-2">${rows}</div>
     <div class="mt-3 text-center">
@@ -220,9 +240,16 @@ export function renderResortDetail(ctx = {}) {
     </div>`;
   }
   const v = verdict || { verdict: 'caution', icon: '🟡', label: '' };
-  const stationCards = (analysis.locations || [])
-    .map((a, i) => (a && !a.failed ? stationCard(a, resort, i, ctx) : failedStationCard(a, i)))
-    .join('');
+  const headLabel = v.verdict === 'avoid' && v.safetyGate ? '🔴 شرایط ایمنی نامناسب' : `${v.icon} ${v.label}`;
+  const summary = plainSummary({ resort, verdict: v, bestWindow });
+
+  // Best-elevation station first; the rest collapse behind a toggle.
+  const cards = (analysis.locations || [])
+    .map((a, i) => ({ a, i, html: a && !a.failed ? stationCard(a, resort, i, ctx) : failedStationCard(a, i) }));
+  const bestIdx = bestElev?.available ? (analysis.locations || []).findIndex((a) => a && !a.failed && a.zone === bestElev.zone) : 0;
+  const firstIdx = bestIdx >= 0 ? bestIdx : cards.length ? cards.findIndex((c) => c.a && !c.a.failed) : -1;
+  const first = cards[firstIdx]?.html || cards[0]?.html || '';
+  const rest = cards.filter((_, k) => k !== firstIdx).map((c) => c.html);
 
   return `
   <div class="fade-in">
@@ -230,23 +257,24 @@ export function renderResortDetail(ctx = {}) {
       <div class="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <div class="text-sm opacity-90 font-bold">${esc(ctx.dateLabel || '')} • ${esc(resort.fullNameFa || resort.nameFa)}</div>
-          <div class="text-2xl md:text-3xl font-black mt-1">${v.icon} ${v.label}</div>
-          <div class="text-sm font-bold mt-1 opacity-95">${esc((v.reasons || [])[0] || '')}</div>
+          <div class="text-2xl md:text-3xl font-black mt-1">${esc(headLabel)}</div>
+          <div class="text-base font-bold mt-2 opacity-95">${esc(summary)}</div>
         </div>
         <div class="flex gap-2">
           <button class="bg-white/20 hover:bg-white/30 rounded-xl px-3 py-2 text-sm font-black" data-action="share-resort">اشتراک ↗</button>
         </div>
       </div>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
-        <div class="bg-white/15 rounded-2xl p-3">${barRow('🎿 کیفیت اسکی', analysis.ski, 'bar-ski')}</div>
-        <div class="bg-white/15 rounded-2xl p-3">${barRow('🛡 ایمنی', analysis.safety, 'bar-safety')}</div>
-        <div class="bg-white/15 rounded-2xl p-3">${barRow('❄️ کیفیت برف (برآورد)', analysis.snowScore, 'bar-snow')}</div>
+        <div class="bg-white/15 rounded-2xl p-3">${barRow('🎿 شاخص کیفیت اسکی', analysis.ski, 'bar-ski')}</div>
+        <div class="bg-white/15 rounded-2xl p-3">${barRow('🛡 شاخص ایمنی', analysis.safety, 'bar-safety')}</div>
+        <div class="bg-white/15 rounded-2xl p-3">${barRow('❄️ شاخص کیفیت برف (برآورد)', analysis.snowScore, 'bar-snow')}</div>
       </div>
+      <p class="text-xs opacity-75 mt-2">شاخص‌ها برآوردی‌اند و دقت علمی ندارند. باندبندی: ۸۰+ خوب • ۶۵+ قابل قبول • ۵۰+ متوسط • ۳۵+ ضعیف • کمتر از ۳۵ نامناسب</p>
       <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3 text-center text-sm font-bold">
         <div class="bg-white/15 rounded-xl p-2">🌨️ تازه<br><span class="tnum">${fmtCm(analysis.fresh24hCm)}</span></div>
         <div class="bg-white/15 rounded-xl p-2">💨 باد قله<br><span class="tnum">${fmtKmh(analysis.wind)}</span></div>
         <div class="bg-white/15 rounded-xl p-2">👁️ دید<br><span class="tnum">${fmtKm(analysis.visKm)}</span></div>
-        <div class="bg-white/15 rounded-xl p-2">🎯 اطمینان<br><span class="tnum">${faNum(confidence?.pct)}٪ (${esc(confidence?.label || '')})</span></div>
+        <div class="bg-white/15 rounded-xl p-2">🎯 پایه توصیه<br><span class="tnum">${esc(confidence?.label || 'نامشخص')}</span></div>
       </div>
       ${stale ? `<div class="mt-2 text-xs font-bold">⚠️ آخرین داده ذخیره‌شده (${esc(fmtTime(updatedAt))}) — ${esc(ctx.staleNote || '')}</div>` : ''}
       ${lateDay ? `<div class="mt-2 text-sm font-bold bg-black/25 rounded-xl px-3 py-2">🌙 ساعات اسکی امروز تقریباً گذشته است — این تحلیل بر اساس کل روز است؛ برای برنامه‌ریزی، روزهای آینده را ببین.</div>` : ''}
@@ -257,7 +285,7 @@ export function renderResortDetail(ctx = {}) {
         <h3 class="font-black mb-2">⏰ بهترین بازه امروز</h3>
         ${bestWindow?.available
           ? `<div class="text-xl font-black accent-text tnum">${esc(faNum(bestWindow.label))}</div>
-             <div class="text-xs opacity-70 mt-1">میانگین امتیاز ساعتی: ${faNum(bestWindow.avgScore)}</div>
+             <div class="text-xs opacity-70 mt-1">میانگین شاخص ساعتی: ${faNum(bestWindow.avgScore)}</div>
              <ul class="why-list mt-2">${(bestWindow.why || []).map((w) => `<li>• ${esc(w)}</li>`).join('')}</ul>`
           : `<p class="text-sm opacity-70">${esc(bestWindow?.reason || 'نامشخص')}</p>`}
       </div>
@@ -281,11 +309,35 @@ export function renderResortDetail(ctx = {}) {
     <div class="glass-card p-4 mb-6">
       <h3 class="font-black mb-3">🕐 تایم‌لاین ساعات اسکی (۷ تا ۱۶)</h3>
       ${renderTimeline(ctx.timeline || [], bestWindow)}
-      <p class="meta-line mt-2">نوار سبز = امتیاز ساعتی؛ خانه پررنگ = بازه پیشنهادی</p>
+      <p class="meta-line mt-2">نوار زیر هر ساعت = شاخص آن ساعت (سبز: خوب، قرمز: ضعیف) • ستون پررنگ = بازه پیشنهادی</p>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">${stationCards}</div>
+    <div>${first}</div>
+    ${rest.length ? `
+    <details class="snowf-details my-4">
+      <summary>ایستگاه‌های دیگر (${faNum(rest.length)})</summary>
+      <div class="details-body">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">${rest.join('')}</div>
+      </div>
+    </details>` : ''}
   </div>`;
+}
+
+/** Plain-language one-liner: what a beginner should read first. */
+function plainSummary({ resort, verdict, bestWindow }) {
+  const name = resort?.nameFa || 'پیست';
+  if (verdict.verdict === 'avoid') {
+    const reason = (verdict.reasons || [])[0] || 'شرایط مساعد نیست';
+    return verdict.safetyGate
+      ? `${name}: ایمنی پایین است — رفتن توصیه نمی‌شود.`
+      : `${name}: ${reason} — رفتن توصیه نمی‌شود.`;
+  }
+  if (verdict.verdict === 'caution') {
+    const win = bestWindow?.available ? ` بهترین بازه: ${bestWindow.label}.` : '';
+    return `${name}: قابل اسکی است ولی با احتیاط.${win}`;
+  }
+  const win = bestWindow?.available ? ` بهترین بازه: ${bestWindow.label}.` : '';
+  return `${name}: شرایط مناسب است.${win}`;
 }
 
 function windStatus(w) {
@@ -312,7 +364,7 @@ function stationCard(a, resort, locIdx, ctx) {
   if (a.refreeze?.likely) flagPills.push(`<span class="pill pill-warn text-xs">🧊 ${esc(a.refreeze.label)}</span>`);
   if (a.rainOnSnow?.active) flagPills.push(`<span class="pill pill-bad text-xs">${esc(a.rainOnSnow.label)}</span>`);
   if (a.freezingRain?.likely) flagPills.push(`<span class="pill pill-bad text-xs">${esc(a.freezingRain.label)}</span>`);
-  if (a.windLoading) flagPills.push(`<span class="pill pill-warn text-xs">🌬️ احتمال انباشت باد (برآورد)</span>`);
+  if (a.windLoading) flagPills.push(`<span class="pill pill-warn text-xs">🌬️ احتمال انباشت برف توسط باد (برآورد)</span>`);
 
   return `
   <article class="glass-card rounded-3xl overflow-hidden">
@@ -367,7 +419,7 @@ function stationCard(a, resort, locIdx, ctx) {
       </div>
       <div class="soft-card p-3">
         <div class="font-black">❄️ ${esc(a.snow.label)} <span class="text-xs opacity-60">(برآورد)</span></div>
-        <div class="text-xs opacity-70 mt-1">عمق: <b class="tnum">${a.depthCm === null ? 'نامشخص' : fmtCm(a.depthCm)}</b> • تازه ۲۴ساعته: <b class="tnum">${fmtCm(a.fresh24hCm)}</b></div>
+        <div class="text-xs opacity-70 mt-1">عمق برف: <b class="tnum">${a.depthCm === null ? 'نامشخص' : fmtCm(a.depthCm)}</b> • برف تازه ۲۴ ساعته: <b class="tnum">${fmtCm(a.fresh24hCm)}</b></div>
       </div>
       <div class="soft-card p-3">
         <div class="flex items-center justify-between gap-2">
@@ -376,7 +428,7 @@ function stationCard(a, resort, locIdx, ctx) {
         </div>
         ${(a.risk.drivers || []).slice(0, 2).map((d) => `<div class="text-xs opacity-70 mt-1">• ${esc(d.label)}</div>`).join('')}
       </div>
-      ${a.freezingReading?.text ? `<div class="soft-card p-3 text-xs"><b>🧊 سطح انجماد:</b> <span class="tnum">${esc(faNum(a.freezingReading.text))}</span></div>` : ''}
+      ${a.freezingReading?.text ? `<div class="soft-card p-3 text-xs"><span>${esc(a.freezingReading.text)}</span></div>` : ''}
       <div class="soft-card p-3 text-xs flex justify-between gap-2">
         <span>🕶️ لنز: <b>${esc(a.lens.fa)}</b> <span class="opacity-60 dir-ltr">(${esc(a.lens.vlt)})</span></span>
         <span>☀️ UV <b class="tnum">${faNum(a.uv)}</b></span>
@@ -462,7 +514,7 @@ export function renderAnalysisPanel(ctx = {}) {
       </div>
     </div>
     <details class="snowf-details mb-2">
-      <summary>🔍 جزئیات امتیازها (چرا این عدد؟)</summary>
+      <summary>🔍 جزئیات شاخص‌ها (چرا این عدد؟)</summary>
       <div class="details-body">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div><h4 class="font-black text-sm mb-1">🎿 کیفیت اسکی</h4>${factorList(skiFactors)}</div>
@@ -471,11 +523,12 @@ export function renderAnalysisPanel(ctx = {}) {
       </div>
     </details>
     <div class="flex flex-wrap gap-2 text-xs">
-      <span class="pill">🎯 اطمینان توصیه: <b class="tnum">${faNum(confidence?.pct)}٪</b> (${esc(confidence?.label || '')})</span>
+      <span class="pill">🎯 پایه توصیه: <b>${esc(confidence?.label || 'نامشخص')}</b> <span class="opacity-70 tnum">(${faNum(confidence?.pct)}٪ کاملی داده)</span></span>
       <span class="pill">📡 کیفیت داده: <b>${dqLabel}</b></span>
       <span class="pill">⛰️ ریسک جوی: <b>${risk?.icon || ''} ${esc(risk?.label || '')}</b> (برآورد)</span>
     </div>
-    ${(confidence?.notes || []).length ? `<p class="meta-line mt-2">علت کاهش اطمینان: ${esc(confidence.notes.join(' • '))}</p>` : ''}
+    <p class="meta-line mt-2">«پایه توصیه» احتمال درست بودن پیش‌بینی نیست؛ فقط نشان می‌دهد داده‌های موجود چقدر کامل، تازه و هماهنگ بوده‌اند.</p>
+    ${(confidence?.notes || []).length ? `<p class="meta-line mt-1">دلیل پایین‌تر بودن پایه: ${esc(confidence.notes.join(' • '))}</p>` : ''}
     <p class="meta-line mt-2">⏱ آخرین به‌روزرسانی داده: ${updatedAt ? esc(fmtTime(updatedAt)) : '—'} ${stale ? '⚠️ (ذخیره‌شده)' : ''} • افق پیش‌بینی: ${faNum(APP.forecastDays)} روز • منبع: ${esc(APP.dataSource)}</p>
     <p class="meta-line mt-1">⚠️ ${esc(RISK.disclaimer)}</p>
   </div>`;
@@ -541,8 +594,8 @@ export function renderCompare(rows = [], { dateLabel = '' } = {}) {
 export function renderSnowPanel({ resortName = '', days = [] } = {}) {
   if (!days.length) {
     return `<div class="glass-card p-5 rounded-2xl text-center">
-      <p class="font-black">تا ۱۶ روز آینده فرصت برفی قابل توجهی دیده نمی‌شود!</p>
-      <p class="text-sm opacity-60 mt-1">زمان خوبی برای پیست کوبیده است ❄️</p>
+      <p class="font-black">تا ۱۶ روز آینده، فرصت برفی قابل توجهی دیده نمی‌شود</p>
+      <p class="text-sm opacity-60 mt-1">برنامه‌ی خوبی برای استراحت یا نگهداری تجهیزات است ❄️</p>
     </div>`;
   }
   return `

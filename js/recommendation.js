@@ -246,7 +246,11 @@ export function bestElevation(locationAnalyses = []) {
     const sr = runner.a.snow.score;
     if (sw - sr >= 10) reasons.push(`کیفیت برف بهتر (${winner.a.snow.label})`);
     if (!reasons.length) {
-      reasons.push(`بهترین ترکیب امتیاز (اسکی ${winner.a.ski.score}، ایمنی ${winner.a.safety.score})`);
+      reasons.push(
+        winner.d.verdict === 'avoid'
+          ? 'هیچ ایستگاهی شرایط مناسب ندارد — تفاوت‌ها جزئی است'
+          : `بهترین ترکیب شاخص‌ها (کیفیت ${winner.a.ski.score}، ایمنی ${winner.a.safety.score})`
+      );
     }
   } else {
     reasons.push('تنها ایستگاه دارای داده');

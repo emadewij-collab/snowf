@@ -14,7 +14,7 @@ import {
   confidenceFor, trendFromHourly, hourlySkiScore, VERDICTS,
 } from './recommendation.js';
 import { rankResorts, rankDays, snowOpportunity, findBestPick, compareTableRows } from './comparison.js';
-import { renderHourlyChart, hasCharts, destroyHourlyChart } from './charts.js';
+import { renderHourlyChart, ensureChart, destroyHourlyChart } from './charts.js';
 import * as UI from './ui.js';
 
 // ---------------------------------------------------------------- state
@@ -283,9 +283,12 @@ function renderStaleBanner() {
   const anyStale = S.order.some((id) => (S.wx[id] || []).some((r) => r && !r.error && r.stale));
   const anyError = S.order.some((id) => (S.wx[id] || []).some((r) => r && r.error));
   const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+  let latest = 0;
+  for (const id of S.order) for (const r of S.wx[id] || []) if (r && !r.error && r.updatedAt > latest) latest = r.updatedAt;
   if (offline || anyStale) {
     el.classList.remove('hidden');
-    el.innerHTML = `<div class="banner banner-warn">⚠️ ${offline ? 'به اینترنت متصل نیستی — ' : ''}آخرین داده ذخیره‌شده نمایش داده می‌شود. ساعت داده هر بخش جداگانه مشخص است.</div>`;
+    const t = latest ? UI.fmtTime(latest) : '—';
+    el.innerHTML = `<div class="banner banner-warn">⚠️ ${offline ? 'آفلاین — ' : ''}داده‌های ذخیره‌شده نمایش داده می‌شوند (آخرین دریافت: ${t}). پیش‌بینی تازه فقط با اینترنت ممکن است.</div>`;
   } else if (anyError) {
     el.classList.remove('hidden');
     el.innerHTML = `<div class="banner banner-warn">⚠️ دریافت داده بعضی ایستگاه‌ها ناموفق بود — بخش‌های دارای داده نمایش داده می‌شوند. <button class="underline font-black" data-action="retry">تلاش مجدد</button></div>`;
@@ -378,7 +381,7 @@ function renderDetail() {
     timeline: b.timeline,
     stale: b.stale,
     updatedAt: b.updatedAt,
-    staleNote: 'اتصال را بررسی کن',
+    staleNote: 'به‌روزرسانی نشده',
     lateDay: b.lateDay,
     dateLabel: `${UI.dayLabel(S.day, dateStr)}${dateStr ? ` • ${UI.fmtFull(dateStr)}` : ''}`,
   });
@@ -628,11 +631,19 @@ async function retryLoad() {
   loadRoad(S.resort);
 }
 
-function openChart(locIdx) {
+async function openChart(locIdx) {
   const b = analyze(S.resort, S.day, S.profile);
   const a = b.locs[locIdx];
   if (!a || a.failed) {
     UI.toast('داده ساعتی موجود نیست');
+    return;
+  }
+  // Load Chart.js on demand (first open only).
+  UI.toast('در حال بارگذاری نمودار...');
+  try {
+    await ensureChart();
+  } catch {
+    UI.toast('نمودار فقط با اتصال به اینترنت بارگذاری می‌شود');
     return;
   }
   const dateStr = b.resort.date;
@@ -640,7 +651,7 @@ function openChart(locIdx) {
   const canvas = $('hourly-chart');
   const ok = renderHourlyChart(canvas, a._hours, a.depthCm);
   if (!ok) {
-    UI.toast(hasCharts() ? 'خطا در رسم نمودار' : 'نمودار نیاز به اینترنت دارد (CDN)');
+    UI.toast('خطا در رسم نمودار');
     return;
   }
   $('hourly-modal').classList.remove('hidden');

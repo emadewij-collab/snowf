@@ -91,7 +91,7 @@ export function calculateSkiQuality(ctx = {}, profileId = 'intermediate') {
       isNum(ctx.sustainedKmh) || isNum(ctx.gustKmh)
         ? `باد ${isNum(ctx.sustainedKmh) ? Math.round(ctx.sustainedKmh) : '—'} / گاست ${isNum(ctx.gustKmh) ? Math.round(ctx.gustKmh) : '—'} km/h`
         : 'داده باد موجود نیست';
-    add('wind', sustained || gust ? `${b.label} (مؤثر ≈${Math.round(effWind)})` : b.label, b.points, detail);
+    add('wind', sustained || gust ? `${b.label} (باد+گاست ≈${Math.round(effWind)})` : b.label, b.points, detail);
   }
 
   // 5) Visibility (comfort side).

@@ -15,14 +15,15 @@
   <!-- Fonts: Vazirmatn -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="preconnect" href="https://unpkg.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 
   <!-- Tailwind CSS -->
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
-  <!-- Chart.js (hourly modal only) -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Chart.js به‌تأخیر و فقط هنگام باز شدن نمودار ساعتی بارگذاری می‌شود (js/charts.js) -->
 
   <link rel="stylesheet" href="./css/themes.css">
   <link rel="stylesheet" href="./css/main.css">
@@ -150,12 +151,28 @@
     <!-- Methodology (short) -->
     <section class="max-w-4xl mx-auto mt-10 fade-in">
       <details class="snowf-details">
-        <summary>📐 روش امتیازدهی و محدودیت‌ها</summary>
+        <summary>📐 روش کار و محدودیت‌ها</summary>
         <div class="details-body text-sm leading-7 opacity-90">
-          <p><b>کیفیت اسکی (۰–۱۰۰):</b> ترکیب عمق برف، برف تازه ۲۴ ساعته، وضعیت سطح برف (برآورد)، باد مؤثر، دید، دمای احساسی، ابر و بارش حین اسکی. هر عامل فقط یک‌بار اثر می‌گذارد.</p>
-          <p><b>ایمنی (۰–۱۰۰):</b> مستقل از کیفیت؛ بر اساس گاست باد، دید، شدت بارش، باران روی برف/یخ‌زده، سرمای شدید، ناپایداری همرفتی و بدتر شدن شرایط. <b>اگر ایمنی پایین باشد، توصیه هرگز «برو» نمی‌شود</b> — حتی با برف عالی.</p>
-          <p><b>ریسک جوی کوهستان:</b> صرفاً برآوردی از روی داده هواشناسی است و <b>جایگزین گزارش رسمی بهمن، اطلاعیه پیست یا توصیه کارشناسان کوهستان نیست.</b></p>
+          <p><b>شاخص کیفیت اسکی (۰–۱۰۰):</b> ترکیب عمق برف، برف تازه ۲۴ ساعته، وضعیت سطح برف (برآورد)، باد (با گاست)، دید، دمای احساسی، ابر و بارش حین اسکی. هر عامل فقط یک‌بار اثر می‌گذارد.</p>
+          <p><b>شاخص ایمنی (۰–۱۰۰):</b> مستقل از کیفیت؛ بر اساس گاست باد، دید، شدت بارش، باران روی برف/یخ‌زده، سرمای شدید، ناپایداری همرفتی و بدتر شدن شرایط. <b>اگر ایمنی پایین باشد، توصیه هرگز «برو» نمی‌شود</b> — حتی با برف عالی. رتبه‌ی کلی هرگز به‌جای ایمنی قرائت نشود.</p>
+          <p><b>معنی اعداد:</b> اعداد برآوردی‌اند و دقت علمی ندارند؛ برای قضاوت، باند را ببینید: <b>۸۰+ خوب • ۶۵+ قابل قبول • ۵۰+ متوسط • ۳۵+ ضعیف • کمتر از ۳۵ نامناسب.</b></p>
+          <p><b>پایه توصیه:</b> میزان کاملی، تازگی و هماهنگی داده‌های موجود — <b>احتمال درست بودن پیش‌بینی نیست.</b></p>
+          <p><b>ریسک جوی کوهستان:</b> صرفاً برآوردی از روی داده هواشناسی است و <b>نمی‌تواند جایگزین گزارش رسمی بهمن، اطلاعیه پیست یا توصیه کارشناسان کوهستان باشد.</b></p>
           <p class="meta-line mt-2">منبع داده: Open-Meteo (رایگان، بدون کلید) • همه فرمول‌ها در فایل <span class="dir-ltr">js/config.js</span> مستند و قابل تنظیم‌اند.</p>
+        </div>
+      </details>
+      <details class="snowf-details mt-2">
+        <summary>📖 راهنمای اصطلاحات (برای شروع ساده)</summary>
+        <div class="details-body text-sm leading-7 opacity-90">
+          <div class="grid grid-cols-1 gap-2">
+            <div class="soft-card p-3"><b>شاخص کیفیت اسکی:</b> چقدر اسکی در این پیست «دوست‌داشتنی» است (برف، باد، دید، دما). یک برآورد است.</div>
+            <div class="soft-card p-3"><b>ایمنی:</b> میزان خطر فیزیکی شرایط جوی. این شاخص رأی را محدود می‌کند و با کیفیت جبران نمی‌شود.</div>
+            <div class="soft-card p-3"><b>کیفیت برف:</b> وضعیت احتمالی سطح برف (پودر، کوبیده، خیس، یخ‌زده…) — فقط برآورد.</div>
+            <div class="soft-card p-3"><b>گاست باد:</b> ضربه‌های لحظه‌ای و شدیدترِ باد؛ مهم‌ترین عامل ایمنی.</div>
+            <div class="soft-card p-3"><b>فرصت برف:</b> آیا در روزهای آینده «برف قابل استفاده‌ای» می‌آید؟</div>
+            <div class="soft-card p-3"><b>پایه توصیه:</b> داده‌ها چقدر کامل و هماهنگ بوده‌اند (نه احتمال صحت پیش‌بینی).</div>
+            <div class="soft-card p-3"><b>برآورد:</b> نتیجه‌ای که از داده‌های مدل هوا مشتق شده و ممکن است با واقعیت کوهستان تفاوت داشته باشد.</div>
+          </div>
         </div>
       </details>
     </section>

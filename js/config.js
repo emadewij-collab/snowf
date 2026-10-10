@@ -258,7 +258,7 @@ export const RISK = {
     { max: Infinity, id: 'high', label: 'خیلی بالا', icon: '🔴' },
   ],
   disclaimer:
-    'این شاخص صرفاً برآوردی از شرایط جوی مرتبط با ریسک کوهستان است و جایگزین گزارش رسمی بهمن، اطلاعیه پیست یا توصیه کارشناسان کوهستان نیست.',
+    'این شاخص صرفاً برآوردی از شرایط جوی مرتبط با ریسک کوهستان است و نمی‌تواند جایگزین گزارش رسمی بهمن، اطلاعیه پیست یا توصیه کارشناسان کوهستان باشد.',
 };
 
 // ---------------------------------------------------------------------------
@@ -302,11 +302,12 @@ export const PROFILES = {
 };
 
 // Profile nudges applied inside Ski Quality (documented, explainable).
+// Labels use plain Persian; "پاداش"/"کاهش" show the direction of the nudge.
 export const PROFILE_NUDGES = {
   casual: [
-    { when: 'cold', points: -2, label: 'جریمه سرما (حالت تفریحی)' },
+    { when: 'cold', points: -2, label: 'کاهش به‌خاطر سرما (حالت تفریحی)' },
     { when: 'goodVis', points: 2, label: 'پاداش دید خوب (حالت تفریحی)' },
-    { when: 'windy', points: -3, label: 'جریمه باد (حالت تفریحی)' },
+    { when: 'windy', points: -3, label: 'کاهش به‌خاطر باد (حالت تفریحی)' },
   ],
   intermediate: [],
   advanced: [
@@ -317,7 +318,7 @@ export const PROFILE_NUDGES = {
   powder: [
     { when: 'deepFresh', points: 8, label: 'پاداش برف تازه (حالت پودر)' },
     { when: 'someFresh', points: 4, label: 'پاداش برف تازه (حالت پودر)' },
-    { when: 'noFresh', points: -6, label: 'بدون برف تازه (حالت پودر)' },
+    { when: 'noFresh', points: -6, label: 'کاهش به‌خاطر نبود برف تازه (حالت پودر)' },
   ],
 };
 

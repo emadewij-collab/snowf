@@ -266,13 +266,14 @@ function windowTempTrend(rows) {
 
 function freezingLevelReading(freezingLevelM, stationAltM) {
   if (!isNum(freezingLevelM)) return { text: null, cold: null };
+  const fl = freezingLevelM.toLocaleString('fa-IR');
   if (!isNum(stationAltM)) {
-    return { text: `سطح انجماد ${freezingLevelM.toLocaleString('en')} متر`, cold: null };
+    return { text: `سطح انجماد ${fl} متر`, cold: null };
   }
   const diff = stationAltM - freezingLevelM;
-  if (diff >= 150) return { text: `سطح انجماد ${freezingLevelM.toLocaleString('en')} م — ایستگاه بالاتر (سردتر ❄)`, cold: true };
-  if (diff <= -150) return { text: `سطح انجماد ${freezingLevelM.toLocaleString('en')} م — ایستگاه پایین‌تر (گرم‌تر 🌡)`, cold: false };
-  return { text: `سطح انجماد ${freezingLevelM.toLocaleString('en')} م — نزدیک ارتفاع ایستگاه`, cold: null };
+  if (diff >= 150) return { text: `سطح انجماد ${fl} متر — ایستگاه بالاتر از آن است (سردتر ❄)`, cold: true };
+  if (diff <= -150) return { text: `سطح انجماد ${fl} متر — ایستگاه پایین‌تر از آن است (گرم‌تر 🌡)`, cold: false };
+  return { text: `سطح انجماد ${fl} متر — نزدیک به ارتفاع ایستگاه`, cold: null };
 }
 
 function lensAdvice(win, day) {
@@ -346,6 +347,6 @@ export function analyzeRoad(data, horizonH = 6) {
     label: labels[level],
     notes,
     minTemp: minTemp === Infinity ? null : Math.round(minTemp),
-    disclaimer: 'برآورد شرایط جوی مسیر است، نه وضعیت قطعی جاده.',
+    disclaimer: 'این برآوردی از شرایط جوی مسیر است و وضعیت واقعی جاده را نشان نمی‌دهد.',
   };
 }

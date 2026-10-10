@@ -8,6 +8,30 @@ import { isNum } from './weather.js';
 
 let hourlyChart = null;
 
+/**
+ * Chart.js is loaded lazily (only when the hourly modal is opened the first
+ * time) to keep the initial page load light. Fails gracefully offline.
+ */
+let chartPromise = null;
+export function ensureChart() {
+  if (typeof window === 'undefined') return Promise.reject(new Error('no window'));
+  if (window.Chart) return Promise.resolve(true);
+  if (!chartPromise) {
+    chartPromise = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+      s.crossOrigin = 'anonymous';
+      s.onload = () => (window.Chart ? resolve(true) : reject(new Error('chart missing')));
+      s.onerror = () => {
+        chartPromise = null;
+        reject(new Error('cdn failed'));
+      };
+      document.head.appendChild(s);
+    });
+  }
+  return chartPromise;
+}
+
 export function hasCharts() {
   return typeof window !== 'undefined' && typeof window.Chart !== 'undefined';
 }

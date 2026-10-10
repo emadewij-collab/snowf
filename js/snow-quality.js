@@ -129,7 +129,7 @@ export function detectRefreeze({ prevDayMax = null, nightMin = null, morningTemp
     return {
       likely: true,
       label: 'احتمال یخ‌زدگی / برف سفت',
-      detail: `دیروز تا ${Math.round(prevDayMax)}° گرم شده، شب تا ${Math.round(nightMin)}° سرد شده است`,
+      detail: `دیروز دما تا ${Math.round(prevDayMax)}° بالا رفته و شب تا ${Math.round(nightMin)}° پایین آمده`,
     };
   }
   return { likely: false, label: null, detail: null };
