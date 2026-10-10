@@ -331,7 +331,9 @@ function renderBestPickSection() {
   }
   const pick = findBestPick(cands, S.profile);
   const el = $('best-pick');
-  if (!pick) {
+  // Never promote an AVOID day: if nothing in the window is at least CAUTION,
+  // the CTA is not useful — the snow panel already says "no snow ahead".
+  if (!pick || pick.verdict.verdict === 'avoid') {
     el.classList.add('hidden');
     el.innerHTML = '';
     return;
