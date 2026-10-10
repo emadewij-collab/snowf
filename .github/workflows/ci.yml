@@ -17,7 +17,7 @@ jobs:
         run: |
           for f in js/*.js service-worker.js; do node --check "$f" || exit 1; done
       - name: Unit tests
-        run: node --test tests/
+        run: node --test
       - name: JSON validation
         run: |
           node -e "JSON.parse(require('fs').readFileSync('data/resorts.json','utf8')); JSON.parse(require('fs').readFileSync('manifest.json','utf8')); console.log('JSON OK')"
