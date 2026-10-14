@@ -30,7 +30,7 @@ describe('rankDays', () => {
       { dayIndex: 2, ski: 95, safety: 20, depthCm: 80, risk: { band: 'high' } },
       { dayIndex: 3, ski: 75, safety: 80, depthCm: 50, risk: { band: 'low' } },
     ];
-    const top = rankDays(days, 'intermediate', 3);
+    const top = rankDays(days, 3);
     assert.equal(top.length, 3);
     assert.equal(top[0].dayIndex, 1);
     assert.equal(top[1].dayIndex, 3);

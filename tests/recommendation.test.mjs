@@ -32,16 +32,6 @@ describe('decide (SAFETY OVERRIDE)', () => {
     const d = decide({ ski: 60, safety: 90, depthCm: 3, hardStops: [] });
     assert.equal(d.verdict, 'avoid');
   });
-
-  it('casual profile raises the GO bar (stricter), never lowers safety', () => {
-    const mid = decide({ ski: 70, safety: 68, depthCm: 40, hardStops: [] }, 'intermediate');
-    const casual = decide({ ski: 70, safety: 68, depthCm: 40, hardStops: [] }, 'casual');
-    assert.equal(mid.verdict, 'go');
-    assert.equal(casual.verdict, 'caution');
-    // advanced can be lenient on quality but NEVER on safety:
-    const adv = decide({ ski: 46, safety: 50, depthCm: 40, hardStops: [] }, 'advanced');
-    assert.notEqual(adv.verdict, 'go');
-  });
 });
 
 describe('hourlySkiScore + findBestWindow', () => {
@@ -75,7 +65,7 @@ describe('hourlySkiScore + findBestWindow', () => {
 describe('bestElevation', () => {
   const loc = (zone, ski, safety, wind = 15, visKm = 10) => ({
     zone, shortFa: zone, nameFa: zone, ski: { score: ski }, safety: { score: safety, hardStops: [] },
-    snow: { score: ski, label: 'x' }, risk: { band: 'low' }, wind, visKm, depthCm: 40, profileId: 'intermediate',
+    snow: { score: ski, label: 'x' }, risk: { band: 'low' }, wind, visKm, depthCm: 40,
   });
   it('picks the best station with a reason', () => {
     const r = bestElevation([loc('summit', 60, 60, 45, 3), loc('mid', 80, 80, 12, 12), loc('low', 70, 75, 10, 9)]);

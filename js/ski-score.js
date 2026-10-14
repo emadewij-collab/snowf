@@ -13,7 +13,7 @@
  * Pure module: no DOM, no network. Safe to unit-test in Node.
  */
 
-import { SKI, PROFILE_NUDGES } from './config.js';
+import { SKI } from './config.js';
 import { isNum } from './weather.js';
 
 function bandMin(bands, value, fallbackLabel = '') {
@@ -35,10 +35,9 @@ function bandMax(bands, value) {
  *   { depthCm, fresh24hCm, surfaceCategory, sustainedKmh, gustKmh,
  *     visKm, feelsLikeC, cloudPct, snowRateMax, rainMm,
  *     freezingRain (bool), capeMax, liMin }
- * @param {string} profileId — casual | intermediate | advanced | powder
  * @returns {{ score, factors, effWind, missing: string[] }}
  */
-export function calculateSkiQuality(ctx = {}, profileId = 'intermediate') {
+export function calculateSkiQuality(ctx = {}) {
   const factors = [];
   const missing = [];
   const add = (key, label, points, detail = null) => {
@@ -154,60 +153,9 @@ export function calculateSkiQuality(ctx = {}, profileId = 'intermediate') {
     }
   }
 
-  // 10) Profile nudges — quality-side preference only.
-  applyProfileNudges(profileId, { fresh, vis, feels, effWind, sustained }, factors);
-
   // Final total recomputed from the recorded factors (single source of truth).
   score = SKI.base + factors.reduce((s, f) => s + (f.points || 0), 0);
 
   score = Math.max(0, Math.min(100, Math.round(score)));
   return { score, factors, effWind: Math.round(effWind * 10) / 10, missing };
-}
-
-function applyProfileNudges(profileId, { fresh, vis, feels, effWind }, factors) {
-  const nudges = PROFILE_NUDGES[profileId] || [];
-  const push = (key, label, points) => factors.push({ key, label, points, profile: profileId });
-  for (const n of nudges) {
-    switch (n.when) {
-      case 'cold':
-        if (isNum(feels) && feels < -10) push('nudge', n.label, n.points);
-        break;
-      case 'goodVis':
-        if (isNum(vis) && vis >= 5) push('nudge', n.label, n.points);
-        break;
-      case 'windy':
-        if (isNum(effWind) && effWind > 25) push('nudge', n.label, n.points);
-        break;
-      case 'breezy':
-        if (isNum(effWind) && effWind >= 20 && effWind <= 38) push('nudge', n.label, n.points);
-        break;
-      case 'lowVisOk':
-        if (isNum(vis) && vis >= 2 && vis < 5) push('nudge', n.label, n.points);
-        break;
-      case 'coldOk':
-        if (isNum(feels) && feels >= -17 && feels < -10) push('nudge', n.label, n.points);
-        break;
-      case 'deepFresh':
-        if (isNum(fresh) && fresh >= 10) push('nudge', n.label, n.points);
-        break;
-      case 'someFresh':
-        if (isNum(fresh) && fresh >= 5 && fresh < 10) push('nudge', n.label, n.points);
-        break;
-      case 'noFresh':
-        if (!isNum(fresh) || fresh < 2) push('nudge', n.label, n.points);
-        break;
-      default:
-        break;
-    }
-  }
-}
-
-/** Human label for a ski-quality score. */
-export function skiQualityLabel(score) {
-  if (!isNum(score)) return 'نامشخص';
-  if (score >= 80) return 'عالی';
-  if (score >= 65) return 'خوب';
-  if (score >= 50) return 'متوسط';
-  if (score >= 35) return 'ضعیف';
-  return 'خیلی ضعیف';
 }

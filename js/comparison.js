@@ -28,13 +28,12 @@ export function blendScore(ski, safety) {
 /**
  * Rank analyzed resort-days for "where should we go?".
  * @param {Array} list of analyzeResortDay outputs (+ verdict attached by caller or here)
- * @param {string} profileId
  */
-export function rankResorts(list = [], profileId = 'intermediate') {
+export function rankResorts(list = []) {
   const rows = list
     .filter((r) => r && !r.failed)
     .map((r) => {
-      const d = r.verdict || decide({ ski: r.ski, safety: r.safety, depthCm: r.depthCm, hardStops: r.hardStops, riskBand: r.risk?.band }, profileId);
+      const d = r.verdict || decide({ ski: r.ski, safety: r.safety, depthCm: r.depthCm, hardStops: r.hardStops, riskBand: r.risk?.band });
       return { ...r, verdict: d, blend: blendScore(r.ski, r.safety) };
     })
     .sort((a, b) => VERDICT_ORDER[a.verdict.verdict] - VERDICT_ORDER[b.verdict.verdict] || b.blend - a.blend);
@@ -50,11 +49,11 @@ export function rankResorts(list = [], profileId = 'intermediate') {
  * Rank future days for ONE resort (best ski days ahead).
  * @param {Array} days array of { dayIndex, date, ski, safety, snowScore, fresh, wind, visKm, depthCm, risk, hardStops }
  */
-export function rankDays(days = [], profileId = 'intermediate', topN = 3) {
+export function rankDays(days = [], topN = 3) {
   const rows = days
     .filter((d) => d && isNum(d.ski))
     .map((d) => {
-      const v = decide({ ski: d.ski, safety: d.safety, depthCm: d.depthCm, hardStops: d.hardStops, riskBand: d.risk?.band }, profileId);
+      const v = decide({ ski: d.ski, safety: d.safety, depthCm: d.depthCm, hardStops: d.hardStops, riskBand: d.risk?.band });
       return { ...d, verdict: v, blend: blendScore(d.ski, d.safety) };
     })
     .sort((a, b) => VERDICT_ORDER[a.verdict.verdict] - VERDICT_ORDER[b.verdict.verdict] || b.blend - a.blend);
@@ -126,11 +125,11 @@ export function snowOpportunity(ctx = {}) {
  * single best (resort, day) + top 3 reasons.
  * @param {Array} candidates [{ resortId, nameFa, dayIndex, date, ski, safety, snowScore, fresh, wind, gust, visKm, depthCm, risk, hardStops, window }]
  */
-export function findBestPick(candidates = [], profileId = 'intermediate') {
+export function findBestPick(candidates = []) {
   const rows = candidates
     .filter((c) => c && isNum(c.ski))
     .map((c) => {
-      const v = decide({ ski: c.ski, safety: c.safety, depthCm: c.depthCm, hardStops: c.hardStops, riskBand: c.risk?.band }, profileId);
+      const v = decide({ ski: c.ski, safety: c.safety, depthCm: c.depthCm, hardStops: c.hardStops, riskBand: c.risk?.band });
       return { ...c, verdict: v, blend: blendScore(c.ski, c.safety) };
     })
     .sort((a, b) => VERDICT_ORDER[a.verdict.verdict] - VERDICT_ORDER[b.verdict.verdict] || b.blend - a.blend);

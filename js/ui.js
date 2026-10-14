@@ -101,19 +101,46 @@ export function refreshIcons() {
 }
 
 // ---------------------------------------------------------------- hero
-export function renderHero(ranked = [], { dateLabel = '', profileLabel = '', stale = false } = {}) {
+const HERO_TABS = [
+  { id: 'today', label: 'امروز' },
+  { id: 'tomorrow', label: 'فردا' },
+  { id: 'week', label: 'این هفته' },
+];
+
+export function segTabs(items, active, action, ariaLabel = 'انتخاب حالت') {
+  return `<div class="seg" role="tablist" aria-label="${ariaLabel}">` +
+    items.map((i) => `<button role="tab" aria-selected="${i.id === active}" class="${i.id === active ? 'active' : ''}" data-action="${action}" data-mode="${i.id}">${i.label}</button>`).join('') +
+    `</div>`;
+}
+
+/**
+ * Hero payload:
+ *  today/tomorrow: { mode, ranked, dateLabel, stale }
+ *  week:           { mode, weekRows, weekBest, allAvoid }
+ */
+export function renderHero({ mode, ranked = [], dateLabel = '', stale = false, weekRows = [], weekBest = null, allAvoid = false } = {}) {
+  const title = mode === 'tomorrow' ? '🏔️ فردا کجا بریم؟' : mode === 'week' ? '️ این هفته کجا و چه روزی؟' : '🏔️ امروز کجا بریم؟';
+  const head = `<div class="flex items-center justify-between gap-3 flex-wrap mb-4">
+    <h2 class="section-title !mb-0">${title}</h2>
+    ${segTabs(HERO_TABS, mode, 'hero-mode')}
+  </div>`;
+
+  if (mode === 'week') {
+    return head + renderHeroWeek(weekRows, weekBest, allAvoid);
+  }
+
   if (!ranked.length) {
-    return `<div class="banner banner-bad">⚠️ داده‌ای برای بررسی پیست‌ها موجود نیست.</div>`;
+    return head + `<div class="banner banner-bad">⚠️ داده‌ای برای بررسی پیست‌ها موجود نیست.</div>`;
   }
   const top = ranked[0];
   const v = top.verdict || { verdict: 'caution' };
-  const allAvoid = ranked.every((r) => (r.verdict?.verdict || 'avoid') === 'avoid');
+  const allAvoid2 = ranked.every((r) => (r.verdict?.verdict || 'avoid') === 'avoid');
   const rows = ranked
     .map((r) => {
       const safetyWarn = isNum(r.safety) && r.safety < 65 ? ' <span title="ایمنی نیازمند احتیاط">⚠️</span>' : '';
       return `
-      <button class="rank-row ${!allAvoid && r.rank === 1 ? 'top' : ''}" data-action="goto-resort" data-resort="${esc(r.resortId)}" aria-label="نمایش ${esc(r.nameFa)}">
-        <span class="text-xl">${allAvoid ? '❄️' : r.medal}</span>
+      <button class="rank-row ${!allAvoid2 && r.rank === 1 ? 'top' : ''}" data-action="goto-resort" data-resort="${esc(r.resortId)}" aria-label="نمایش ${esc(r.nameFa)}">
+        <span class="text-xl">${allAvoid2 ? '❄️' : r.medal}</span>
         <span class="font-black flex-1">${esc(r.nameFa)}</span>
         <span class="text-xs opacity-70 tnum">🎿 ${faNum(r.ski)} • 🛡 ${faNum(r.safety)}${safetyWarn}</span>
         <span class="text-lg">${(VERDICTS[r.verdict.verdict] || {}).icon || ''}</span>
@@ -121,26 +148,25 @@ export function renderHero(ranked = [], { dateLabel = '', profileLabel = '', sta
     })
     .join('');
 
-  // #11: when NO resort is a good option, never promote the "least bad" one.
-  if (allAvoid) {
+  if (allAvoid2) {
     const reasons = (top.verdict?.reasons || []).slice(0, 2).join(' • ');
-    return `
+    return head + `
     <div class="verdict-avoid rounded-2xl p-5 text-white">
-      <div class="text-2xl font-black">❄️ برای امروز هیچ پیست پیشنهاد نمی‌شود</div>
+      <div class="text-2xl font-black">❄️ برای ${mode === 'tomorrow' ? 'فردا' : 'امروز'} هیچ پیست پیشنهاد نمی‌شود</div>
       <div class="text-sm leading-6 opacity-95 mt-2">
         ${esc(reasons || 'شرایط جوی مساعد نیست')}. رفتن توصیه نمی‌شود.
-        برای روزهای آینده دکمه‌ی «کی برف میاد؟» و پیش‌بینی چندروزه را ببینید.
+        برای روزهای دیگر، حالت «این هفته» و دکمه‌ی «کی برف میاد؟» را ببینید.
       </div>
     </div>
     <div class="flex flex-col gap-2 mt-3">${rows}</div>
-    <p class="meta-line mt-3 text-center">شاخص‌ها برآوردی‌اند و دقت علمی ندارند • ${esc(profileLabel)}</p>`;
+    <p class="meta-line mt-3 text-center">شاخص‌ها برآوردی‌اند و دقت علمی ندارند</p>`;
   }
 
-  return `
+  return head + `
     <div class="verdict-${v.verdict} rounded-2xl p-4 md:p-5 text-white mb-4">
       <div class="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <div class="text-xs opacity-80 font-bold mb-1">🥇 بهترین انتخاب ${esc(dateLabel)} • حالت ${esc(profileLabel)}</div>
+          <div class="text-xs opacity-80 font-bold mb-1">🥇 بهترین انتخاب ${esc(dateLabel)}</div>
           <button class="text-3xl font-black hover:underline" data-action="goto-resort" data-resort="${esc(top.resortId)}">${esc(top.nameFa)}</button>
           <div class="mt-1 font-bold">${v.icon} ${v.label || ''}</div>
         </div>
@@ -169,6 +195,43 @@ export function renderHero(ranked = [], { dateLabel = '', profileLabel = '', sta
     <div class="mt-3 text-center">
       <button class="btn btn-ghost text-sm" data-action="goto-resort" data-resort="${esc(top.resortId)}">نمایش جزئیات ${esc(top.nameFa)} ←</button>
     </div>`;
+}
+
+/** Week view: best resort per day + the single best (resort, day). */
+function renderHeroWeek(weekRows = [], weekBest = null, allAvoid = false) {
+  if (!weekRows.length) {
+    return `<div class="banner banner-bad">⚠️ داده‌ای برای هفته موجود نیست.</div>`;
+  }
+  const best = allAvoid
+    ? `<div class="verdict-avoid rounded-2xl p-4 md:p-5 text-white mb-4">
+        <div class="text-xl font-black">❄️ در این هفته هیچ روز مناسبی پیدا نشد</div>
+        <div class="text-sm leading-6 opacity-95 mt-1">برای برف، «کی برف میاد؟» را تا ۱۶ روز آینده چک کنید.</div>
+      </div>`
+    : weekBest
+    ? `
+    <div class="verdict-${weekBest.verdict.verdict} rounded-2xl p-4 md:p-5 text-white mb-4">
+      <div class="text-xs opacity-80 font-bold mb-1">⭐ بهترین روز هفته • ${weekBest.verdict.icon} ${esc(weekBest.verdict.label || '')}</div>
+      <button class="text-2xl font-black hover:underline" data-action="goto-resort-day" data-resort="${esc(weekBest.resortId)}" data-day="${weekBest.dayIndex}">
+        📍 ${esc(weekBest.nameFa)} — 📅 ${esc(fmtFull(weekBest.date))}
+      </button>
+      ${weekBest.windowLabel ? `<div class="font-bold mt-1">⏰ ساعت پیشنهادی: ${esc(weekBest.windowLabel)}</div>` : ''}
+      <div class="flex flex-wrap gap-2 mt-2 text-xs font-bold">
+        ${(weekBest.reasons || []).map((r) => `<span class="bg-white/15 rounded-lg px-2 py-1">${esc(r)}</span>`).join('')}
+      </div>
+    </div>`
+    : '';
+  const rows = weekRows
+    .map((r) => `
+      <button class="rank-row" data-action="goto-resort-day" data-resort="${esc(r.resortId)}" data-day="${r.dayIndex}" aria-label="نمایش ${esc(r.nameFa)} در ${esc(r.label)}">
+        <span class="font-bold w-28 text-right shrink-0">${esc(r.label)}<span class="block text-xs opacity-60 font-normal">${esc(r.dateShort)}</span></span>
+        <span class="font-black flex-1">${esc(r.nameFa)}</span>
+        <span class="text-xs opacity-70 tnum">🎿 ${faNum(r.ski)} • 🛡 ${faNum(r.safety)}</span>
+        <span class="text-lg">${(VERDICTS[r.verdict] || {}).icon || ''}</span>
+      </button>`)
+    .join('');
+  return `${best}
+    <div class="flex flex-col gap-2">${rows}</div>
+    <p class="meta-line mt-3 text-center">برای هر روز، بهترین پیست هفته انتخاب شده • شاخص‌ها برآوردی‌اند</p>`;
 }
 
 // ---------------------------------------------------------------- best pick
@@ -204,12 +267,6 @@ export function renderPills(resorts = {}, ids = [], { active = '', favorites = [
         <button class="star-btn ${fav ? 'fav' : ''}" data-action="toggle-fav" data-resort="${esc(id)}" title="${fav ? 'حذف از علاقه‌مندی' : 'علاقه‌مندی'}" aria-label="${fav ? 'حذف از علاقه‌مندی' : 'افزودن به علاقه‌مندی'} ${esc(r.nameFa)}" aria-pressed="${fav}">${fav ? '⭐' : '☆'}</button>
       </span>`;
     })
-    .join('');
-}
-
-export function renderProfileOptions(profiles = {}, active = 'intermediate') {
-  return Object.values(profiles)
-    .map((p) => `<option value="${esc(p.id)}" ${p.id === active ? 'selected' : ''}>${esc(p.icon)} ${esc(p.label)}</option>`)
     .join('');
 }
 
@@ -488,16 +545,25 @@ export function renderForecastStrip(days = [], selected = 0) {
 }
 
 // ---------------------------------------------------------------- analysis
+const ANALYSIS_TABS = [
+  { id: 'today', label: 'امروز' },
+  { id: 'tomorrow', label: 'فردا' },
+  { id: 'week', label: 'هفته' },
+];
+
 export function renderAnalysisPanel(ctx = {}) {
-  const { verdict, why, confidence, dataQuality, risk, updatedAt, stale, resortName, dateLabel, skiFactors, safetyFactors } = ctx;
+  const { verdict, why, confidence, dataQuality, risk, updatedAt, stale, resortName, dateLabel, skiFactors, safetyFactors, mode = 'today' } = ctx;
   const v = verdict || { verdict: 'caution', icon: '🟡', label: '' };
   const dqLabel = dataQuality?.level === 'good' ? '✅ خوب' : dataQuality?.level === 'limited' ? '⚠️ محدود' : '🔴 ضعیف';
   return `
   <div class="glass-card rounded-3xl p-5 md:p-6 relative overflow-hidden">
     <div class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-l from-purple-500 via-pink-500 to-orange-500"></div>
-    <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
-      <h2 class="section-title !mb-0">🧭 تحلیل تصمیم <span class="text-sm font-bold opacity-60">— ${esc(resortName || '')}، ${esc(dateLabel || '')}</span></h2>
-      ${verdictBadge(v.verdict, 'text-sm')}
+    <div class="flex items-center justify-between gap-3 flex-wrap mb-3">
+      <div class="flex items-center gap-3 flex-wrap">
+        <h2 class="section-title !mb-0">🧭 تحلیل تصمیم <span class="text-sm font-bold opacity-60">— ${esc(resortName || '')}، ${esc(dateLabel || '')}</span></h2>
+        ${verdictBadge(v.verdict, 'text-sm')}
+      </div>
+      ${segTabs(ANALYSIS_TABS, mode, 'analysis-mode')}
     </div>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
       <div class="soft-card p-3">
@@ -534,13 +600,53 @@ export function renderAnalysisPanel(ctx = {}) {
   </div>`;
 }
 
+/** Week mode: 7-day decision table for ONE resort. */
+export function renderAnalysisWeek({ resortName = '', days = [], mode = 'week' } = {}) {
+  const icon = { go: '🟢', caution: '🟡', avoid: '🔴' };
+  const allAvoid = days.length > 0 && days.every((d) => d.verdict === 'avoid');
+  const caption = allAvoid
+    ? 'هیچ روزی این هفته رأی «برو» نگرفت — برای برف، «کی برف میاد؟» را تا ۱۶ روز آینده ببینید.'
+    : '⭐ بهترین روز هفته (بر اساس رأی + ترکیب شاخص‌ها) • ریسک و ایمنی در رأی لحاظ شده‌اند';
+  const body = days.length
+    ? `<div class="compare-wrap" style="border-radius:14px;border:1px solid var(--border)">
+      <table class="compare-table">
+        <thead><tr class="opacity-70">
+          <th class="p-3">روز</th><th class="p-3">رأی</th><th class="p-3">🎿 کیفیت</th>
+          <th class="p-3">🛡 ایمنی</th><th class="p-3">🌨️ تازه</th><th class="p-3">⏰ بهترین بازه</th>
+        </tr></thead>
+        <tbody>
+          ${days.map((d) => `
+          <tr class="${d.isBest ? 'best-row' : ''}">
+            <td class="p-3 font-black whitespace-nowrap">${d.isBest ? '⭐ ' : ''}${esc(d.label)} <span class="block text-xs opacity-60 font-normal">${esc(d.dateShort)}</span></td>
+            <td class="p-3 text-lg" title="${esc((VERDICTS[d.verdict] || {}).label || '')}">${icon[d.verdict] || ''}</td>
+            <td class="p-3 tnum font-bold">${faNum(d.ski)}</td>
+            <td class="p-3 tnum font-bold">${faNum(d.safety)}</td>
+            <td class="p-3 tnum font-bold">${faNum(d.fresh)} cm</td>
+            <td class="p-3 tnum text-xs font-bold whitespace-nowrap">${d.windowLabel ? esc(faNum(d.windowLabel)) : '—'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    <p class="meta-line mt-2">${esc(caption)}</p>`
+    : `<p class="text-sm opacity-60">داده‌ای برای هفته موجود نیست.</p>`;
+  return `
+  <div class="glass-card rounded-3xl p-5 md:p-6 relative overflow-hidden">
+    <div class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-l from-purple-500 via-pink-500 to-orange-500"></div>
+    <div class="flex items-center justify-between gap-3 flex-wrap mb-4">
+      <h2 class="section-title !mb-0">🧭 تحلیل هفته — ${esc(resortName || '')}</h2>
+      ${segTabs(ANALYSIS_TABS, mode, 'analysis-mode')}
+    </div>
+    ${body}
+  </div>`;
+}
+
 function factorList(factors = []) {
   if (!factors?.length) return '<p class="text-xs opacity-60">—</p>';
   return factors
     .map((f) => {
       const cls = (f.points || 0) > 0 ? 'factor-plus' : (f.points || 0) < 0 ? 'factor-minus' : 'factor-zero';
       const pts = (f.points || 0) > 0 ? `+${faNum(f.points)}` : faNum(f.points || 0);
-      return `<div class="factor-row"><span>${esc(f.label)}${f.profile ? ' <span class="opacity-60">(حالت کاربر)</span>' : ''}</span><span class="${cls} tnum">${pts}</span></div>`;
+      return `<div class="factor-row"><span>${esc(f.label)}</span><span class="${cls} tnum">${pts}</span></div>`;
     })
     .join('');
 }

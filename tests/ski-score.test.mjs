@@ -11,7 +11,7 @@ const GOOD = {
 
 describe('calculateSkiQuality', () => {
   it('scenario 1: cold + calm + fresh snow → high score', () => {
-    const r = calculateSkiQuality(GOOD, 'intermediate');
+    const r = calculateSkiQuality(GOOD);
     assert.ok(r.score >= 80, `expected >= 80, got ${r.score}`);
     assert.ok(r.factors.length > 5);
   });
@@ -29,19 +29,19 @@ describe('calculateSkiQuality', () => {
   });
 
   it('thin cover (<8cm) tanks the score', () => {
-    const base = calculateSkiQuality(GOOD, 'intermediate');
+    const base = calculateSkiQuality(GOOD);
     const r = calculateSkiQuality({ ...GOOD, depthCm: 4 });
     assert.ok(r.score < base.score - 25, `got ${r.score} vs base ${base.score}`);
   });
 
   it('scenario 3: rain during ski hours penalizes quality', () => {
-    const base = calculateSkiQuality(GOOD, 'intermediate');
+    const base = calculateSkiQuality(GOOD);
     const r = calculateSkiQuality({ ...GOOD, rainMm: 3, surfaceCategory: 'wet' });
     assert.ok(r.score < base.score - 20, `got ${r.score} vs base ${base.score}`);
   });
 
   it('scenario 6: very low visibility penalizes quality', () => {
-    const base = calculateSkiQuality(GOOD, 'intermediate');
+    const base = calculateSkiQuality(GOOD);
     const r = calculateSkiQuality({ ...GOOD, visKm: 0.4 });
     assert.ok(r.score < base.score - 20, `got ${r.score} vs base ${base.score}`);
   });
@@ -52,16 +52,6 @@ describe('calculateSkiQuality', () => {
     assert.ok(r.score >= 0 && r.score <= 100);
     assert.ok(r.missing.includes('visKm'));
     assert.ok(r.missing.includes('depthCm'));
-  });
-
-  it('powder profile rewards fresh snow; casual profile is stricter on wind', () => {
-    const powder = calculateSkiQuality(GOOD, 'powder');
-    const base = calculateSkiQuality(GOOD, 'intermediate');
-    assert.ok(powder.score > base.score, `${powder.score} vs ${base.score}`);
-    const windy = { ...GOOD, sustainedKmh: 30, gustKmh: 40 };
-    const casual = calculateSkiQuality(windy, 'casual');
-    const adv = calculateSkiQuality(windy, 'advanced');
-    assert.ok(adv.score > casual.score, `${adv.score} vs ${casual.score}`);
   });
 
   it('score always within 0..100', () => {

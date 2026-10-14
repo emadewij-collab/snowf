@@ -76,7 +76,7 @@ export function cacheClear() {
   } catch { /* ignore */ }
 }
 
-// --- Tiny typed store for UI preferences (favorites, theme, profile, ...) ---
+// --- Tiny typed store for UI preferences (favorites, theme, hero/analysis mode, ...) ---
 export function storeGet(key, fallback = null) {
   try {
     if (typeof localStorage === 'undefined') return fallback;

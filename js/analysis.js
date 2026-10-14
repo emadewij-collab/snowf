@@ -24,11 +24,10 @@ import { calculateSkiQuality } from './ski-score.js';
  * @param {object} data Open-Meteo forecast JSON (or null on fetch failure)
  * @param {number} dayIndex index into daily.time
  * @param {object} meta { alt, nameFa, shortFa, zone }
- * @param {object} opts { profileId, fromHour (for today: skip past hours) }
+ * @param {object} opts { fromHour (for today: skip past hours) }
  * @returns analysis object, or { failed: true, ... } when data is missing.
  */
 export function analyzeLocationDay(data, dayIndex, meta = {}, opts = {}) {
-  const profileId = opts.profileId || 'intermediate';
   const base = {
     failed: false,
     alt: meta.alt ?? null,
@@ -121,25 +120,22 @@ export function analyzeLocationDay(data, dayIndex, meta = {}, opts = {}) {
     risk
   );
 
-  // --- Ski quality (profile-aware) ---
-  const ski = calculateSkiQuality(
-    {
-      depthCm: depthKnown ? depthCm : null,
-      fresh24hCm: fresh24h,
-      surfaceCategory: snow.category,
-      sustainedKmh: win.maxWind,
-      gustKmh: win.maxGust,
-      visKm: win.minVisKm,
-      feelsLikeC: win.avgFeels,
-      cloudPct: win.avgCloud,
-      snowRateMax: win.maxSnowRate,
-      rainMm,
-      freezingRain: freezingRain.likely,
-      capeMax: win.maxCape,
-      liMin: win.minLi,
-    },
-    profileId
-  );
+  // --- Ski quality ---
+  const ski = calculateSkiQuality({
+    depthCm: depthKnown ? depthCm : null,
+    fresh24hCm: fresh24h,
+    surfaceCategory: snow.category,
+    sustainedKmh: win.maxWind,
+    gustKmh: win.maxGust,
+    visKm: win.minVisKm,
+    feelsLikeC: win.avgFeels,
+    cloudPct: win.avgCloud,
+    snowRateMax: win.maxSnowRate,
+    rainMm,
+    freezingRain: freezingRain.likely,
+    capeMax: win.maxCape,
+    liMin: win.minLi,
+  });
 
   // --- Extras (kept from v2: lens, lift estimate, sun, fog) ---
   const lens = lensAdvice(win, day);
@@ -148,7 +144,6 @@ export function analyzeLocationDay(data, dayIndex, meta = {}, opts = {}) {
   return {
     ...base,
     date: day.date,
-    profileId,
     windowCount: win.count,
     lateDay, // true when the ski window had already ended for "today"
     // headline numbers (null = unknown → UI shows N/A)

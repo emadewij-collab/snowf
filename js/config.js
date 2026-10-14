@@ -21,14 +21,14 @@
 export const APP = {
   nameFa: 'برف‌کو',
   nameEn: 'SnowF',
-  version: 'v3.0',
+  version: 'v3.1',
   timezone: 'Asia/Tehran',
   locale: 'fa-IR',
   dataSource: 'Open-Meteo',
   forecastDays: 16,
 };
 
-export const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes (fresh forecast)
+export const CACHE_TTL_MS = 60 * 60 * 1000; // 1h: reopening the site within an hour makes NO new request
 export const STALE_OK_MS = 6 * 60 * 60 * 1000; // accept stale cache offline up to 6h (flagged)
 
 // Skiable hours of day (local time) used for "best time" search.
@@ -262,8 +262,8 @@ export const RISK = {
 };
 
 // ---------------------------------------------------------------------------
-// VERDICT gates. Safety gates are GLOBAL FLOORS — profiles may only raise
-// the GO bar (casual), never lower it.
+// VERDICT gates. Safety gates are GLOBAL FLOORS — quality can never
+// lower the safety bar (single unified mode; user profiles removed).
 // ---------------------------------------------------------------------------
 export const VERDICT = {
   safetyAvoidBelow: 40, // safety < 40 → AVOID, no matter the quality
@@ -271,55 +271,6 @@ export const VERDICT = {
   qualityAvoidBelow: 30, // quality < 30 → AVOID (miserable, not worth it)
   qualityCautionBelow: 50, // quality < 50 → at most CAUTION
   minDepthCm: 8, // below → AVOID with "likely closed / thin cover" note
-};
-
-// ---------------------------------------------------------------------------
-// USER PROFILES — quality-side preference only. Safety floors untouched.
-// Deltas are small additive nudges recorded as explainable factors.
-// ---------------------------------------------------------------------------
-export const PROFILES = {
-  casual: {
-    id: 'casual', label: 'تفریحی / خانواده', icon: '🧣',
-    desc: 'اولویت با ایمنی، دید خوب و هوای ملایم',
-    goSafetyMin: 72, // stricter than global 65 — allowed (raising the bar)
-    goQualityMin: 55,
-  },
-  intermediate: {
-    id: 'intermediate', label: 'متوسط', icon: '🎿',
-    desc: 'تعادل بین کیفیت برف و راحتی',
-    goSafetyMin: 65, goQualityMin: 50,
-  },
-  advanced: {
-    id: 'advanced', label: 'حرفه‌ای', icon: '⛷️',
-    desc: 'تحمل بیشتر باد و سرما، تمرکز بر کیفیت برف',
-    goSafetyMin: 65, goQualityMin: 45, // quality bar may drop; safety NEVER below global
-  },
-  powder: {
-    id: 'powder', label: 'شکارچی پودر', icon: '❄️',
-    desc: 'اولویت با برف تازه؛ ایمنی همچنان خط قرمز است',
-    goSafetyMin: 65, goQualityMin: 50,
-  },
-};
-
-// Profile nudges applied inside Ski Quality (documented, explainable).
-// Labels use plain Persian; "پاداش"/"کاهش" show the direction of the nudge.
-export const PROFILE_NUDGES = {
-  casual: [
-    { when: 'cold', points: -2, label: 'کاهش به‌خاطر سرما (حالت تفریحی)' },
-    { when: 'goodVis', points: 2, label: 'پاداش دید خوب (حالت تفریحی)' },
-    { when: 'windy', points: -3, label: 'کاهش به‌خاطر باد (حالت تفریحی)' },
-  ],
-  intermediate: [],
-  advanced: [
-    { when: 'breezy', points: 4, label: 'تحمل باد (حالت حرفه‌ای)' },
-    { when: 'lowVisOk', points: 3, label: 'تحمل دید متوسط (حالت حرفه‌ای)' },
-    { when: 'coldOk', points: 2, label: 'تحمل سرما (حالت حرفه‌ای)' },
-  ],
-  powder: [
-    { when: 'deepFresh', points: 8, label: 'پاداش برف تازه (حالت پودر)' },
-    { when: 'someFresh', points: 4, label: 'پاداش برف تازه (حالت پودر)' },
-    { when: 'noFresh', points: -6, label: 'کاهش به‌خاطر نبود برف تازه (حالت پودر)' },
-  ],
 };
 
 // ---------------------------------------------------------------------------

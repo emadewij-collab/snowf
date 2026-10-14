@@ -72,8 +72,13 @@ const ROAD_HOURLY_VARS = [
 
 const inflight = new Map();
 
-function key(lat, lon, kind) {
+export function key(lat, lon, kind) {
   return `${kind}_${Number(lat).toFixed(4)}_${Number(lon).toFixed(4)}`;
+}
+
+/** Cache key for a weather station (exported so the app can peek without fetching). */
+export function wxCacheKey(lat, lon) {
+  return key(lat, lon, 'wx');
 }
 
 // ---------------------------------------------------------------------------

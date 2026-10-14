@@ -13,7 +13,7 @@
  * Pure module: no DOM, no network. Safe to unit-test in Node.
  */
 
-import { VERDICT, PROFILES, SKI_HOURS, CONFIDENCE, FLAGS } from './config.js';
+import { VERDICT, SKI_HOURS, CONFIDENCE, FLAGS } from './config.js';
 import { isNum, feelsLike, r0 } from './weather.js';
 
 export const VERDICTS = {
@@ -24,11 +24,10 @@ export const VERDICTS = {
 
 /**
  * Final verdict for a resort-day (or location-day — same shape).
+ * Single mode (no user profiles): one fixed, documented gate.
  * @param {object} a { ski, safety, depthCm, risk } (numbers or {score})
- * @param {string} profileId
  */
-export function decide(a = {}, profileId = 'intermediate') {
-  const prof = PROFILES[profileId] || PROFILES.intermediate;
+export function decide(a = {}) {
   const ski = num(a.ski);
   const safety = num(a.safety);
   const depth = isNum(a.depthCm) ? a.depthCm : null;
@@ -36,8 +35,8 @@ export function decide(a = {}, profileId = 'intermediate') {
   const riskBand = a.risk?.band || a.riskBand || 'low';
 
   const gate = {
-    safetyMin: Math.max(VERDICT.safetyCautionBelow, prof.goSafetyMin),
-    qualityMin: prof.goQualityMin,
+    safetyMin: VERDICT.safetyCautionBelow,
+    qualityMin: VERDICT.qualityCautionBelow,
   };
   const reasons = [];
   let verdict = 'go';
@@ -69,11 +68,11 @@ export function decide(a = {}, profileId = 'intermediate') {
   }
   // 5) Safety caution zone → at most CAUTION.
   if (isNum(safety) && safety < gate.safetyMin) {
-    reasons.push(`ایمنی ${safety}/۱۰۰ — حد مجاز حالت «${prof.label}» ${gate.safetyMin} است`);
+    reasons.push(`ایمنی ${safety}/۱۰ — برای رأی «برو» حداقل ${gate.safetyMin} لازم است`);
     verdict = 'caution';
   }
   // 6) Quality caution zone → at most CAUTION.
-  if (isNum(ski) && ski < Math.max(VERDICT.qualityCautionBelow, gate.qualityMin)) {
+  if (isNum(ski) && ski < gate.qualityMin) {
     reasons.push(`کیفیت متوسط (${ski}/۱۰۰)`);
     verdict = 'caution';
   }
@@ -226,8 +225,7 @@ export function bestElevation(locationAnalyses = []) {
   const ranked = ok
     .map((a) => {
       const d = decide(
-        { ski: a.ski.score, safety: a.safety.score, depthCm: a.depthCm, hardStops: a.safety.hardStops, riskBand: a.risk.band },
-        a.profileId || 'intermediate'
+        { ski: a.ski.score, safety: a.safety.score, depthCm: a.depthCm, hardStops: a.safety.hardStops, riskBand: a.risk.band }
       );
       return { a, d, rank: (d.verdict === 'avoid' ? -1000 : d.verdict === 'caution' ? -100 : 0) + a.ski.score + a.safety.score / 10 };
     })
