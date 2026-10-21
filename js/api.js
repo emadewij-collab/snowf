@@ -224,27 +224,41 @@ export async function getForecasts(points, opts = {}) {
   for (let i = 0; i < missing.length; i += size) chunks.push(missing.slice(i, i + size));
 
   const updatedAt = Date.now();
+
+  /** Fetch one chunk; returns an array of payloads (or null on failure). */
+  async function fetchChunk(idxs) {
+    const subset = idxs.map((i) => points[i]);
+    const url = buildUrl(subset, hourly, daily, days);
+    const cacheKey = `multi_${kind}_${subset.map((p) => `${Number(p.lat).toFixed(4)},${Number(p.lon).toFixed(4)}`).join(';')}`;
+    try {
+      const payload = await (async () => {
+        if (inflight.has(cacheKey)) return inflight.get(cacheKey);
+        const p = (async () => {
+          const data = await limited(() => fetchJson(url));
+          if (!data) throw new Error('bad-payload');
+          return Array.isArray(data) ? data : [data];
+        })();
+        inflight.set(cacheKey, p);
+        try { return await p; } finally { inflight.delete(cacheKey); }
+      })();
+      return payload;
+    } catch {
+      return null;
+    }
+  }
+
   await Promise.all(
     chunks.map(async (idxs) => {
-      const subset = idxs.map((i) => points[i]);
-      const url = buildUrl(subset, hourly, daily, days);
-      const cacheKey = `multi_${kind}_${subset.map((p) => `${Number(p.lat).toFixed(4)},${Number(p.lon).toFixed(4)}`).join(';')}`;
-      let payload = null;
-      try {
-        payload = await (async () => {
-          if (inflight.has(cacheKey)) return inflight.get(cacheKey);
-          const p = (async () => {
-            const data = await limited(() => fetchJson(url));
-            if (!data) throw new Error('bad-payload');
-            return Array.isArray(data) ? data : [data];
-          })();
-          inflight.set(cacheKey, p);
-          try { return await p; } finally { inflight.delete(cacheKey); }
-        })();
-      } catch {
-        payload = null;
+      let payload = await fetchChunk(idxs);
+      // Fallback: if a chunked request failed, retry its locations one by
+      // one. Single-location requests are much smaller and far less likely
+      // to be dropped by the server.
+      if (!payload) {
+        const singles = await Promise.all(idxs.map((i) => fetchChunk([i])));
+        payload = singles.map((s) => (s ? s[0] : null));
+        if (payload.every((p) => p === null)) payload = null;
       }
-      // 3) Split the response back per location, in request order.
+      // Split the response back per location, in request order.
       idxs.forEach((idx, n) => {
         const data = payload && payload[n];
         if (!data || !data.hourly) {

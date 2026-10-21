@@ -57,6 +57,21 @@ describe('multi-location API client', () => {
     assert.ok(!/getRoadForecast\(/.test(app), 'no per-road requests may remain');
   });
 
+  it('falls back to single-location requests when a chunk fails', () => {
+    assert.ok(
+      api.includes('if (!payload) {'),
+      'a failed chunk must be retried location by location'
+    );
+    assert.ok(api.includes('idxs.map((i) => fetchChunk([i]))'), 'the fallback must request single locations');
+  });
+
+  it('gives the shared API a generous timeout (its latency swings wildly)', () => {
+    const cfg = read('js/config.js');
+    const m = cfg.match(/timeoutMs:\s*(\d+)/);
+    assert.ok(m, 'API.timeoutMs must be defined');
+    assert.ok(Number(m[1]) >= 20000, 'a 15s timeout aborted requests the server still would have answered');
+  });
+
   it('paints each chunk as it lands instead of waiting for the slowest', () => {
     const api = read('js/api.js');
     const app = read('js/app.js');

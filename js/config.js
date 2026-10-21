@@ -55,8 +55,13 @@ export const API = {
   locationsPerRequest: 2,
   /** Maximum number of requests in flight at the same time. */
   maxConcurrent: 6,
-  /** Per-request timeout (ms). */
-  timeoutMs: 15000,
+  /**
+   * Per-request timeout (ms). The free API is a shared service whose latency
+   * swings between ~200 ms and tens of seconds, so the timeout is generous —
+   * a chunk that is slow only holds back its own two stations, and every
+   * chunk paints independently.
+   */
+  timeoutMs: 25000,
   /** Retries after a timeout / network error. */
   retries: 1,
 };
