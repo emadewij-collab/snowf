@@ -52,9 +52,12 @@
     </div>
 
     <div class="flex items-center gap-2 flex-wrap justify-center">
-      <div class="glass-card px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold no-print">
-        <i data-lucide="clock" class="w-4 h-4 opacity-60" aria-hidden="true"></i>
-        <span id="live-clock" class="dir-ltr" aria-label="ساعت زنده"></span>
+      <div class="glass-card px-4 py-2 rounded-xl flex items-center gap-3 text-sm font-bold no-print">
+        <i data-lucide="clock" class="w-4 h-4 opacity-60 shrink-0" aria-hidden="true"></i>
+        <div class="flex flex-col leading-tight">
+          <span id="live-date" aria-label="تاریخ"></span>
+          <span id="live-time" class="dir-ltr tnum text-sm opacity-75" aria-label="ساعت"></span>
+        </div>
       </div>
       <div class="flex glass-card rounded-full p-1.5 no-print" role="group" aria-label="انتخاب تم">
         <button data-theme="theme-sun" class="theme-btn p-2.5 rounded-full hover:bg-white/40 transition-all text-amber-500" title="آفتابی" aria-label="تم آفتابی"><i data-lucide="sun" class="w-5 h-5" aria-hidden="true"></i></button>

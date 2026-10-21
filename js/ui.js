@@ -53,6 +53,44 @@ export function fmtTime(dateMs) {
   return new Intl.DateTimeFormat('fa-IR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: APP.timezone }).format(new Date(dateMs));
 }
 
+/**
+ * Split "now" into a Persian DATE and a separate TIME.
+ *
+ * Why not one string: `Intl` with fa-IR renders the date as
+ * "۱۴۰۵ مهر ۲۹, چهارشنبه ساعت ۱۳:۰۸:۰۷" — the year comes first (not the
+ * natural Persian day-month-year order) and the date and the time are
+ * welded together by the literal "ساعت". Inside a bidi context that
+ * scrambles visually. So we assemble the parts ourselves and keep the two
+ * values in two separate elements (the time in an LTR isolate).
+ *
+ * @returns {{ date: string, time: string }}
+ */
+export function formatClock(date = new Date(), timeZone = APP.timezone) {
+  try {
+    const parts = new Intl.DateTimeFormat('fa-IR', {
+      timeZone,
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }).formatToParts(date);
+    const get = (type) => parts.find((p) => p.type === type)?.value ?? '';
+    // Natural Persian order: weekday, day, month, year.
+    const dateText = [get('weekday'), get('day'), get('month'), get('year')].filter(Boolean).join(' ');
+    // Some ICU builds render midnight as hour 24 — normalise to 00.
+    const rawHour = get('hour');
+    const hour = rawHour === '24' || rawHour === '۲۴' ? '۰۰' : rawHour;
+    const timeText = [hour, get('minute'), get('second')].filter(Boolean).join(':');
+    return { date: dateText, time: timeText };
+  } catch {
+    return { date: '', time: '' };
+  }
+}
+
 // ---------------------------------------------------------------- primitives
 /** CSS class for a score badge (gradient background). */
 function scoreClass(score) {

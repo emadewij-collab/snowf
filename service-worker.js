@@ -90,6 +90,21 @@ self.addEventListener('fetch', (event) => {
       );
       return;
     }
+    // Navigation (the HTML shell): network-first with a cache fallback.
+    // The shell is tiny, so online visitors always get the current markup
+    // immediately instead of a version that is one visit behind; offline
+    // visitors still get the cached shell.
+    if (req.mode === 'navigate') {
+      event.respondWith(
+        fetch(req)
+          .then((res) => {
+            if (res && res.ok) store(STATIC_CACHE, req, res);
+            return res;
+          })
+          .catch(() => caches.match(req, { ignoreSearch: true }).then((hit) => hit || caches.match('./index.html').then((h2) => h2 || Response.error())))
+      );
+      return;
+    }
     event.respondWith(
       caches.match(req).then((hit) => {
         const network = fetch(req)

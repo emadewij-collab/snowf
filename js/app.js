@@ -891,13 +891,15 @@ function applyTheme(theme) {
 }
 
 function startClock() {
+  const dateEl = $('live-date');
+  const timeEl = $('live-time');
+  if (!dateEl || !timeEl) return;
   const tick = () => {
-    try {
-      $('live-clock').textContent = new Intl.DateTimeFormat('fa-IR', {
-        timeZone: APP.timezone, weekday: 'long', year: 'numeric', month: 'long',
-        day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
-      }).format(new Date());
-    } catch { /* ignore */ }
+    // Date and time live in two separate elements so the bidi algorithm can
+    // never interleave them (see UI.formatClock).
+    const { date, time } = UI.formatClock(new Date(), APP.timezone);
+    dateEl.textContent = date;
+    timeEl.textContent = time;
   };
   tick();
   setInterval(tick, 1000);

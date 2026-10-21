@@ -3,10 +3,54 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join, resolve } from 'path';
+import { formatClock } from '../js/ui.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => readFileSync(join(ROOT, p), 'utf8');
 const readJson = (p) => JSON.parse(read(p));
+
+describe('live clock formatting', () => {
+  const TZ = 'Asia/Tehran';
+
+  it('keeps the date and the time as two separate values', () => {
+    const c = formatClock(new Date('2026-10-21T13:08:07+03:30'), TZ);
+    assert.ok(c.date.length > 0);
+    assert.ok(c.time.length > 0);
+    assert.ok(!c.date.includes(':'), 'the date must not contain the time');
+    assert.ok(!c.time.includes('مهر'), 'the time must not contain the date');
+  });
+
+  it('uses the natural Persian order: weekday, day, month, year', () => {
+    const c = formatClock(new Date('2026-10-21T13:08:07+03:30'), TZ);
+    assert.equal(c.date, 'چهارشنبه ۲۹ مهر ۱۴۰۵');
+  });
+
+  it('formats the time as HH:MM:SS with Persian digits', () => {
+    const c = formatClock(new Date('2026-10-21T13:08:07+03:30'), TZ);
+    assert.equal(c.time, '۱۳:۰۸:۰۷');
+  });
+
+  it('renders midnight as 00, never 24', () => {
+    const c = formatClock(new Date('2026-10-21T00:00:00+03:30'), TZ);
+    assert.ok(!c.time.startsWith('۲۴'), `time=${c.time}`);
+    assert.ok(c.time.startsWith('۰۰'), `time=${c.time}`);
+  });
+
+  it('never emits the literal "ساعت" that welded the two together', () => {
+    for (const iso of ['2026-01-05T09:30:00+03:30', '2026-07-21T23:59:59+03:30', '2026-10-21T00:00:00+03:30']) {
+      const c = formatClock(new Date(iso), TZ);
+      assert.ok(!c.date.includes('ساعت'));
+      assert.ok(!c.time.includes('ساعت'));
+    }
+  });
+
+  it('index.html uses two separate clock elements', () => {
+    const html = read('index.html');
+    assert.ok(html.includes('id="live-date"'));
+    assert.ok(html.includes('id="live-time"'));
+    assert.ok(!html.includes('id="live-clock"'), 'the old combined element must be gone');
+  });
+});
 
 describe('release consistency', () => {
   it('package.json version matches APP.version in js/config.js', () => {
@@ -58,6 +102,18 @@ describe('release consistency', () => {
       if (p === './') continue;
       assert.ok(existsSync(join(ROOT, p)), `precached file is missing: ${p}`);
     }
+  });
+
+  it('the service worker serves the HTML shell network-first', () => {
+    const sw = read('service-worker.js');
+    assert.ok(
+      sw.includes("req.mode === 'navigate'"),
+      'navigations must be network-first, otherwise the markup is one visit behind'
+    );
+    assert.ok(
+      sw.includes("api.open-meteo.com"),
+      'the weather API must never be intercepted by the service worker'
+    );
   });
 
   it('every script referenced by index.html exists', () => {
