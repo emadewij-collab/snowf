@@ -315,6 +315,27 @@ function analyze(resortId, day) {
     bundle.stale = stale;
     bundle.lateDay = lateDay;
 
+    // Technical provenance — rendered inside a collapsed "جزئیات فنی" block.
+    bundle.technical = {
+      source: APP.dataSource,
+      model: MODEL.name,
+      gridKm: MODEL.gridKm,
+      sharedCell,
+      stations: locs.filter((a) => !a.failed).map((a) => ({
+        nameFa: a.nameFa,
+        alt: a.alt,
+        demAlt: a.heightCorrection?.demAlt ?? (isNum(a.grid?.elevation) ? Math.round(a.grid.elevation) : null),
+        delta: a.heightCorrection?.applied ? a.heightCorrection.delta : null,
+      })),
+      minSafety: resortA.minSafety,
+      minSafetyZone: resortA.minSafetyZone,
+      dataQuality: bundle.dataQuality,
+      missingCount: missingVars,
+      confidenceNotes: bundle.confidence?.notes || [],
+      updatedAt: bundle.updatedAt,
+      stale,
+    };
+
     bundle.snowOpp = buildOpportunity(resortId, day);
   }
 
@@ -522,7 +543,8 @@ function renderDetail() {
     updatedAt: b.updatedAt,
     staleNote: 'به‌روزرسانی نشده',
     lateDay: b.lateDay,
-    sharedCell: b.sharedCell,
+    technical: b.technical,
+    technicalLabel: dateStr ? UI.fmtDayMonth(dateStr) : '',
     dateLabel: `${UI.dayLabel(S.day, dateStr)}${dateStr ? ` • ${UI.fmtFull(dateStr)}` : ''}`,
   });
 }
@@ -628,7 +650,7 @@ function renderAnalysis() {
     risk: b.resort.risk,
     updatedAt: b.updatedAt,
     stale: b.stale,
-    sharedCell: b.sharedCell,
+    technical: b.technical,
     resortName: b.resort.nameFa,
     dateLabel: `${UI.dayLabel(day, dateStr)}${dateStr ? `، ${UI.fmtDayMonth(dateStr)}` : ''}`,
     ski: b.resort.ski,

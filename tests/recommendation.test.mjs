@@ -180,7 +180,9 @@ describe('confidenceFor', () => {
     const a = confidenceFor({ dayIndex: 1 });
     const b = confidenceFor({ dayIndex: 1, sharedCell: true });
     assert.ok(b.pct < a.pct);
-    assert.ok(b.notes.some((n) => n.includes('سلول شبکه')));
+    // the note must stay free of jargon — it is shown in the primary view
+    assert.ok(b.notes.some((n) => n.includes('مستقل')));
+    assert.ok(!b.notes.some((n) => /سلول شبکه|DEM|grid cell/i.test(n)));
   });
 });
 

@@ -410,7 +410,7 @@ export function confidenceFor({ dayIndex = 0, missingVars = 0, stale = false, co
   }
   if (sharedCell) {
     pct -= CONFIDENCE.sharedCellPenalty;
-    notes.push('ایستگاه‌ها روی یک سلول شبکه‌ی مدل قرار دارند');
+    notes.push('داده‌ی ایستگاه‌ها کاملاً مستقل از هم نیست');
   }
   pct = Math.max(5, Math.min(98, Math.round(pct)));
   const label = pct >= 75 ? 'بالا' : pct >= 55 ? 'متوسط' : 'کم';

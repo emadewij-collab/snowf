@@ -332,9 +332,62 @@ export function renderDaySelector(days = [], selected = 0) {
     .join('');
 }
 
+// ---------------------------------------------------------------- technical layer
+/**
+ * The technical layer: everything about HOW the numbers were produced.
+ * Deliberately collapsed — the primary view stays about the decision,
+ * not about the model grid.
+ *
+ * @param {object} t
+ *   { source, model, gridKm, sharedCell, stations[], minSafety, minSafetyZone,
+ *     dataQuality, missingCount, updatedAt, stale }
+ */
+export function renderTechnicalDetails(t = {}, { label = '' } = {}) {
+  const stations = t.stations || [];
+  const dq = t.dataQuality?.level;
+  const dqLabel = dq === 'good' ? 'خوب' : dq === 'limited' ? 'محدود' : 'ضعیف';
+
+  return `
+  <details class="snowf-details">
+    <summary>🔧 جزئیات فنی محاسبه${label ? ` — ${esc(label)}` : ''}</summary>
+    <div class="details-body text-sm leading-7">
+      <p><b>منبع داده:</b> ${esc(t.source || APP.dataSource)} — مدل <span dir="ltr">${esc(t.model || MODEL.name)}</span> با شبکه‌ی حدود ${faNum(t.gridKm ?? MODEL.gridKm)} کیلومتر.</p>
+
+      <p class="mt-2"><b>تصحیح ارتفاع:</b> دمای مدل به ارتفاع واقعی هر ایستگاه منتقل می‌شود (نرخ گرادیان ۶٫۵ درجه بر کیلومتر). این تنها متغیری است که مدل در شبکه‌ی درشت به‌ازای ارتفاع تفکیک می‌کند.</p>
+      ${stations.length ? `
+      <div class="mt-2 overflow-x-auto">
+        <table class="compare-table" style="min-width: 420px">
+          <thead><tr class="opacity-70">
+            <th class="p-2 text-right">ایستگاه</th><th class="p-2">ارتفاع</th>
+            <th class="p-2">ارتفاع DEM</th><th class="p-2">اصلاح دما</th>
+          </tr></thead>
+          <tbody>
+            ${stations.map((s) => `
+            <tr>
+              <td class="p-2 text-right font-bold">${esc(s.nameFa)}</td>
+              <td class="p-2 tnum">${faNum(s.alt)} m</td>
+              <td class="p-2 tnum opacity-70">${s.demAlt === null ? '—' : faNum(s.demAlt) + ' m'}</td>
+              <td class="p-2 tnum">${s.delta === null ? '<span class="opacity-50">—</span>' : `${s.delta > 0 ? '+' : '−'}${faNum(Math.abs(s.delta), 1)}°C`}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>` : ''}
+
+      ${t.sharedCell ? `
+      <p class="mt-2"><b>⚠️ محدودیت شبکه:</b> بعضی از ایستگاه‌های این پیست در یک سلول از شبکه‌ی مدل می‌افتند. در آن سلول، باد و بارشِ ایستگاه‌ها یکسان است و فقط دما تفکیک می‌شود — پس «بهترین ارتفاع» در چنین پیستی نشانه‌ی داده‌ی مستقل نیست.</p>` : ''}
+
+      ${isNum(t.minSafety) && t.minSafety < 55 ? `
+      <p class="mt-2"><b>کف ایمنی:</b> رأی نهایی علاوه بر میانگین پیست، با ضعیف‌ترین ایستگاه هم محدود می‌شود${t.minSafetyZone ? ` (${esc(t.minSafetyZone)})` : ''}: <span class="tnum">${faNum(t.minSafety)}/۱۰۰</span>.</p>` : ''}
+
+      <p class="mt-2"><b>کیفیت داده:</b> ${esc(dqLabel)}${isNum(t.missingCount) ? ` — ${faNum(t.missingCount)} متغیر کلیدی ناقص` : ''}${t.updatedAt ? ` • آخرین دریافت: ${esc(fmtTime(t.updatedAt))}${t.stale ? ' (ذخیره‌شده)' : ''}` : ''}</p>
+      ${(t.confidenceNotes || []).length ? `<p class="mt-1"><b>پایه توصیه پایین‌تر است چون:</b> ${esc(t.confidenceNotes.join(' • '))}</p>` : ''}
+    </div>
+  </details>`;
+}
+
 // ---------------------------------------------------------------- resort detail
 export function renderResortDetail(ctx = {}) {
-  const { resort, analysis, verdict, bestWindow, bestElev, why, confidence, trend, snowOpp, stale, updatedAt, lateDay, sharedCell } = ctx;
+  const { resort, analysis, verdict, bestWindow, bestElev, why, confidence, trend, snowOpp, stale, updatedAt, lateDay, technical, technicalLabel } = ctx;
   if (!analysis || analysis.failed) {
     return `<div class="glass-card rounded-3xl p-6 text-center">
       <div class="text-4xl mb-2">⚠️</div>
@@ -373,16 +426,9 @@ export function renderResortDetail(ctx = {}) {
         <div class="bg-white/15 rounded-2xl p-3">${barRow('🛡 شاخص ایمنی', analysis.safety, 'bar-safety')}</div>
         <div class="bg-white/15 rounded-2xl p-3">${barRow('❄️ شاخص کیفیت برف (برآورد)', analysis.snowScore, 'bar-snow')}</div>
       </div>
-      <p class="text-xs opacity-75 mt-2">شاخص‌ها برآوردی‌اند و دقت علمی ندارند. باندبندی: ۸۰+ خوب • ۶۵+ قابل قبول • ۵۰+ متوسط • ۳۵+ ضعیف • کمتر از ۳۵ نامناسب</p>
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3 text-center text-sm font-bold">
-        <div class="bg-white/15 rounded-xl p-2">🌨️ تازه<br><span class="tnum">${fmtCm(analysis.fresh24hCm)}</span></div>
-        <div class="bg-white/15 rounded-xl p-2">💨 باد قله<br><span class="tnum">${fmtKmh(analysis.wind)}</span></div>
-        <div class="bg-white/15 rounded-xl p-2">👁️ دید<br><span class="tnum">${fmtKm(analysis.visKm)}</span></div>
-        <div class="bg-white/15 rounded-xl p-2">🎯 پایه توصیه<br><span class="tnum">${esc(confidence?.label || 'نامشخص')}</span></div>
-      </div>
+      <p class="text-xs opacity-75 mt-2">شاخص‌ها برآوردی‌اند. ۸۰+ خوب • ۶۵+ قابل قبول • ۵۰+ متوسط • کمتر از ۳۵ نامناسب</p>
       ${stale ? `<div class="mt-2 text-xs font-bold">⚠️ آخرین داده ذخیره‌شده (${esc(fmtTime(updatedAt))}) — ${esc(ctx.staleNote || '')}</div>` : ''}
       ${lateDay ? `<div class="mt-2 text-sm font-bold bg-black/25 rounded-xl px-3 py-2">🌙 ساعات اسکی امروز تقریباً گذشته است — این تحلیل بر اساس کل روز است؛ برای برنامه‌ریزی، روزهای آینده را ببین.</div>` : ''}
-      ${sharedCell ? `<div class="mt-2 text-xs font-bold bg-black/25 rounded-xl px-3 py-2">📡 بخشی از ایستگاه‌های این پیست روی یک سلول شبکه‌ی مدل (~${MODEL.gridKm} کیلومتر) قرار می‌گیرند؛ در آن سلول فقط دما به‌ازای ارتفاع تفکیک می‌شود و بقیه‌ی متغیرها یکسان‌اند.</div>` : ''}
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -399,7 +445,6 @@ export function renderResortDetail(ctx = {}) {
         ${bestElev?.available
           ? `<div class="text-xl font-black accent-text">${esc(bestElev.nameFa)}</div>
              <ul class="why-list mt-2">${(bestElev.reasons || []).map((w) => `<li>• ${esc(w)}</li>`).join('')}</ul>
-             ${bestElev.sharedCell ? `<p class="meta-line mt-2">⚠️ ایستگاه‌های این پیست روی یک سلول شبکه‌ی مدل (~${MODEL.gridKm} کیلومتر) می‌افتند؛ تفاوتشان فقط از درون‌یابی دما می‌آید، نه از داده‌ی مستقل.</p>` : ''}
              <div class="flex gap-1 mt-2 flex-wrap">${(bestElev.ranking || []).map((r) => `<span class="pill text-xs">${esc(r.shortFa)}: <b class="tnum">${faNum(r.ski)}</b></span>`).join('')}</div>`
           : `<p class="text-sm opacity-70">نامشخص</p>`}
       </div>
@@ -417,6 +462,8 @@ export function renderResortDetail(ctx = {}) {
       ${renderTimeline(ctx.timeline || [], bestWindow)}
       <p class="meta-line mt-2">نوار زیر هر ساعت = شاخص آن ساعت (سبز: خوب، قرمز: ضعیف) • ستون پررنگ = بازه پیشنهادی</p>
     </div>
+
+    <div class="mb-6">${renderTechnicalDetails(technical, { label: technicalLabel })}</div>
 
     <div>${first}</div>
     ${rest.length ? `
@@ -470,13 +517,7 @@ function stationCard(a, resort, locIdx, ctx) {
   if (a.rainOnSnow?.active) flagPills.push(`<span class="pill pill-bad text-xs">${esc(a.rainOnSnow.label)}</span>`);
   if (a.rainOnSnow?.unknown) flagPills.push(`<span class="pill pill-warn text-xs">🌧️ ${esc(a.rainOnSnow.unknownReason)}</span>`);
   if (a.freezingRain?.likely) flagPills.push(`<span class="pill pill-bad text-xs">${esc(a.freezingRain.label)}</span>`);
-  if (a.windLoading) flagPills.push(`<span class="pill pill-warn text-xs">🌬️ احتمال انباشت برف توسط باد (برآورد)</span>`);
-  // Height-correction provenance: the model's grid temperature was shifted to
-  // the station's official altitude. Shown so the number is traceable.
-  const hc = a.heightCorrection;
-  const hcNote = hc && hc.applied
-    ? `<div class="text-xs opacity-70 mt-1" dir="ltr">↕ temp adjusted ${hc.delta > 0 ? '+' : ''}${faNum(hc.delta, 1)}°C (DEM ${faNum(hc.demAlt)}m → station ${faNum(hc.targetAlt)}m)</div>`
-    : '';
+  if (a.windLoading) flagPills.push(`<span class="pill pill-warn text-xs">🌬️ انباشت برف با باد (برآورد)</span>`);
 
   return `
   <article class="glass-card rounded-3xl overflow-hidden">
@@ -500,7 +541,6 @@ function stationCard(a, resort, locIdx, ctx) {
         <div>
           <h3 class="font-black">${esc(a.nameFa)}</h3>
           <span class="text-xs opacity-60 tnum dir-ltr">${faNum(a.alt)}m</span>
-          ${hcNote}
         </div>
       </div>
       <button class="btn btn-ghost text-xs px-3" data-action="open-chart" data-loc="${locIdx}" aria-label="نمودار ساعتی ${esc(a.nameFa)}">📈 ساعتی</button>
@@ -541,15 +581,13 @@ function stationCard(a, resort, locIdx, ctx) {
         </div>
         ${(a.risk.drivers || []).slice(0, 2).map((d) => `<div class="text-xs opacity-70 mt-1">• ${esc(d.label)}</div>`).join('')}
       </div>
-      ${a.freezingReading?.text ? `<div class="soft-card p-3 text-xs"><span>${esc(a.freezingReading.text)}</span></div>` : ''}
-      <div class="soft-card p-3 text-xs flex justify-between gap-2">
+      <div class="soft-card p-3 text-xs flex flex-wrap gap-x-4 gap-y-1 justify-between">
         <span>🕶️ لنز: <b>${esc(a.lens.fa)}</b> <span class="opacity-60 dir-ltr">(${esc(a.lens.vlt)})</span></span>
         <span>☀️ UV <b class="tnum">${faNum(a.uv)}</b></span>
+        <span>🌅 <b class="tnum">${esc(a.sunrise ? faNum(a.sunrise) : '—')}</b></span>
+        <span>🌇 <b class="tnum">${esc(a.sunset ? faNum(a.sunset) : '—')}</b></span>
       </div>
-      <div class="soft-card p-3 text-xs flex justify-between tnum">
-        <span>🌅 ${esc(a.sunrise ? faNum(a.sunrise) : '—')}</span>
-        <span>🌇 ${esc(a.sunset ? faNum(a.sunset) : '—')}</span>
-      </div>
+      ${a.freezingReading?.text ? `<div class="soft-card p-3 text-xs"><span>${esc(a.freezingReading.text)}</span></div>` : ''}
       ${(v.reasons || []).length ? `<div class="text-xs font-bold opacity-80">علت: ${esc(v.reasons.join(' • '))}</div>` : ''}
     </div>
   </article>`;
@@ -595,7 +633,6 @@ export function renderForecastStrip(days = [], selected = 0) {
         <div class="text-xl my-1">${icon[d.verdict] || '⚪'}</div>
         <div class="text-xs tnum font-bold">🎿${faNum(d.ski)} 🛡${faNum(d.safety)}</div>
         <div class="text-xs opacity-70 tnum mt-1">❄️${faNum(d.fresh)}cm • ↓${faNum(d.tmin)}° ↑${faNum(d.tmax)}°</div>
-        ${isNum(d.opp) ? `<div class="text-xs opacity-70 tnum">فرصت برف: ${faNum(d.opp)}</div>` : ''}
       </button>`)
     .join('');
 }
@@ -608,7 +645,7 @@ const ANALYSIS_TABS = [
 ];
 
 export function renderAnalysisPanel(ctx = {}) {
-  const { verdict, why, confidence, dataQuality, risk, updatedAt, stale, resortName, dateLabel, skiFactors, safetyFactors, mode = 'today', sharedCell, minSafety, minSafetyZone } = ctx;
+  const { verdict, why, confidence, dataQuality, risk, updatedAt, stale, resortName, dateLabel, skiFactors, safetyFactors, mode = 'today', technical } = ctx;
   const v = verdict || { verdict: 'caution', icon: '🟡', label: '' };
   const dqLabel = dataQuality?.level === 'good' ? '✅ خوب' : dataQuality?.level === 'limited' ? '⚠️ محدود' : '🔴 ضعیف';
   return `
@@ -626,10 +663,10 @@ export function renderAnalysisPanel(ctx = {}) {
       ${isNum(ctx.ski) ? scoreBadge('🎿', ctx.ski, skiLabel(ctx.ski)) : ''}
       ${isNum(ctx.safety) ? scoreBadge('🛡', ctx.safety, safetyLabel(ctx.safety)) : ''}
     </div>` : ''}
-    ${(isNum(minSafety) && isNum(ctx.safety) && minSafety < ctx.safety) ? `
+    ${(isNum(ctx.minSafety) && isNum(ctx.safety) && ctx.minSafety < ctx.safety) ? `
     <div class="soft-card p-3 mb-3 text-sm">
-      <b>🛡 ایمنی ضعیف‌ترین ایستگاه:</b> <span class="tnum">${faNum(minSafety)}/۱۰۰</span>${minSafetyZone ? ` (${esc(minSafetyZone)})` : ''}
-      — میانگین پیست ${faNum(ctx.safety)} است، اما رأی نهایی با بدترین ایستگاه هم محدود می‌شود.
+      <b>⚠️ یکی از ایستگاه‌های این پیست شرایط ناامن‌تری دارد</b> (${esc(ctx.minSafetyZone || '')}: <span class="tnum">${faNum(ctx.minSafety)}/۱۰۰</span>) —
+      به همین دلیل رأی نهایی با بدترین ایستگاه هم محدود می‌شود.
     </div>` : ''}
     <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
       <div class="soft-card p-3">
@@ -655,15 +692,12 @@ export function renderAnalysisPanel(ctx = {}) {
       </div>
     </details>
     <div class="flex flex-wrap gap-2 text-xs">
-      <span class="pill">🎯 پایه توصیه: <b>${esc(confidence?.label || 'نامشخص')}</b> <span class="opacity-70 tnum">(${faNum(confidence?.pct)}٪ کاملی داده)</span></span>
+      <span class="pill">🎯 پایه توصیه: <b>${esc(confidence?.label || 'نامشخص')}</b> <span class="opacity-70 tnum">(${faNum(confidence?.pct)}٪)</span></span>
       <span class="pill">📡 کیفیت داده: <b>${dqLabel}</b></span>
       <span class="pill">⛰️ ریسک جوی: <b>${risk?.icon || ''} ${esc(risk?.label || '')}</b> (برآورد)</span>
-      <span class="pill">🛰️ شبکه‌ی مدل: <b>${esc(MODEL.name)}</b> <span class="opacity-70">(~${MODEL.gridKm} km)</span></span>
     </div>
-    ${sharedCell ? `<p class="meta-line mt-2">⚠️ برخی ایستگاه‌های این پیست روی یک سلول شبکه‌ی مدل می‌افتند؛ در آن سلول فقط دما به‌ازای ارتفاع تفکیک می‌شود و سایر متغیرها یکسان‌اند — پس «بهترین ارتفاع» در این پیست نشانه‌ی داده‌ی مستقل نیست.</p>` : ''}
-    <p class="meta-line mt-2">«پایه توصیه» احتمال درست بودن پیش‌بینی نیست؛ فقط نشان می‌دهد داده‌های موجود چقدر کامل، تازه و هماهنگ بوده‌اند.</p>
-    ${(confidence?.notes || []).length ? `<p class="meta-line mt-1">دلیل پایین‌تر بودن پایه: ${esc(confidence.notes.join(' • '))}</p>` : ''}
-    <p class="meta-line mt-2">⏱ آخرین به‌روزرسانی داده: ${updatedAt ? esc(fmtTime(updatedAt)) : '—'} ${stale ? '⚠️ (ذخیره‌شده)' : ''} • افق پیش‌بینی: ${faNum(APP.forecastDays)} روز • منبع: ${esc(APP.dataSource)}</p>
+    <p class="meta-line mt-2">«پایه توصیه» احتمال درست بودن پیش‌بینی نیست؛ فقط نشان می‌دهد داده‌های موجود چقدر کامل و تازه بوده‌اند.</p>
+    ${(confidence?.notes || []).length ? `<p class="meta-line mt-1">پایه پایین‌تر است چون: ${esc(confidence.notes.join(' • '))}</p>` : ''}
     <p class="meta-line mt-1">⚠️ ${esc(RISK.disclaimer)}</p>
   </div>`;
 }

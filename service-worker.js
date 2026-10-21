@@ -75,6 +75,13 @@ self.addEventListener('fetch', (event) => {
   // Never intercept the weather API — freshness is handled by the app.
   if (url.hostname === 'api.open-meteo.com') return;
 
+  // Local development: act as a pass-through so an edited file is always
+  // the file the browser runs. The PWA behaviour is exercised on the real
+  // deployment, where the host is not localhost.
+  if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]') {
+    return;
+  }
+
   // Same-origin static assets: stale-while-revalidate.
   if (url.origin === self.location.origin) {
     // The caller explicitly asked for a fresh copy → network first.

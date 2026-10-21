@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join, resolve } from 'path';
-import { formatClock } from '../js/ui.js';
+import { formatClock, renderTechnicalDetails, renderResortDetail } from '../js/ui.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => readFileSync(join(ROOT, p), 'utf8');
@@ -49,6 +49,89 @@ describe('live clock formatting', () => {
     assert.ok(html.includes('id="live-date"'));
     assert.ok(html.includes('id="live-time"'));
     assert.ok(!html.includes('id="live-clock"'), 'the old combined element must be gone');
+  });
+});
+
+describe('technical layer is collapsed, not always visible', () => {
+  const tech = {
+    source: 'Open-Meteo',
+    model: 'best_match',
+    gridKm: 11,
+    sharedCell: true,
+    stations: [{ nameFa: 'قله', alt: 3600, demAlt: 3527, delta: -0.474 }],
+    minSafety: 42,
+    minSafetyZone: 'قله',
+    dataQuality: { level: 'good' },
+    missingCount: 0,
+    updatedAt: Date.now(),
+  };
+
+  it('renders a collapsed <details> block', () => {
+    const html = renderTechnicalDetails(tech, { label: '۲۹ مهر' });
+    assert.ok(html.includes('<details'), 'must be a disclosure element');
+    assert.ok(html.includes('</details>'));
+    assert.ok(!/<details[^>]*\sopen/.test(html), 'must not be open by default');
+  });
+
+  it('carries the provenance data', () => {
+    const html = renderTechnicalDetails(tech, { label: '۲۹ مهر' });
+    assert.ok(html.includes('Open-Meteo'));
+    assert.ok(html.includes('best_match'));
+    assert.ok(html.includes('۳۵۲۷'), 'DEM altitude of the station');
+    assert.ok(html.includes('۳۶۰۰'), 'official station altitude');
+    assert.ok(html.includes('۲۹ مهر'), 'the day it refers to');
+  });
+
+  it('never leaks English technical strings into the Persian UI', () => {
+    const html = renderTechnicalDetails(tech, { label: '۲۹ مهر' });
+    assert.ok(!/temp adjusted|DEM \d|station \d|grid cell/i.test(html));
+  });
+
+  it('hides the safety floor when it does not actually constrain', () => {
+    assert.ok(renderTechnicalDetails({ ...tech, minSafety: 100 }).includes('کف ایمنی') === false);
+    assert.ok(renderTechnicalDetails({ ...tech, minSafety: 42 }).includes('کف ایمنی'));
+  });
+
+  it('keeps the technical details out of the always-visible part of the resort card', () => {
+    const station = {
+      nameFa: 'قله', shortFa: 'قله', zone: 'summit', alt: 3600,
+      failed: false, temp: 5, tempMin: 1, tempMax: 9, feelsLike: 2,
+      wind: 12, gust: 20, windDir: 'شمال', visKm: 41, cloud: 40, humidity: 50,
+      fresh24hCm: 0, depthCm: 0, depthKnown: true, precipMm: 0, probMax: 10,
+      snowRateMax: 0, cape: 0, li: 2, uv: 3, sunrise: '06:45', sunset: '18:10',
+      ski: { score: 14, factors: [] }, safety: { score: 100, factors: [], hardStops: [], flags: [] },
+      snow: { score: 44, label: 'خیس', factors: [] }, risk: { band: 'low', label: 'کم', icon: '🟢', drivers: [] },
+      refreeze: { likely: false }, rainOnSnow: { active: false }, freezingRain: { likely: false },
+      windLoading: false, freezingReading: { text: null, cold: null },
+      lens: { fa: 'شفاف', vlt: '80-95%', when: 'شب' }, lift: 'وضعیت نامشخص',
+      heightCorrection: { applied: true, delta: -0.474, demAlt: 3527, targetAlt: 3600 },
+      grid: { lat: 36.07, lon: 51.49, elevation: 3527 },
+    };
+    const html = renderResortDetail({
+      resort: { nameFa: 'دیزین', fullNameFa: 'پیست دیزین' },
+      analysis: { ski: 14, safety: 100, snowScore: 44, fresh24hCm: 0, locations: [station] },
+      verdict: { verdict: 'avoid', icon: '🔴', label: 'نامناسب برای اسکی', reasons: ['x'] },
+      verdictsByLoc: [{ verdict: 'avoid', icon: '🔴', label: 'نامناسب برای اسکی', reasons: ['x'] }],
+      bestWindow: { available: false, reason: '—' },
+      bestElev: { available: true, nameFa: 'قله', reasons: ['x'], ranking: [], sharedCell: true },
+      why: { pros: [], cons: [], notes: [] },
+      confidence: { label: 'بالا', pct: 80, notes: [] },
+      trend: { label: '—', detail: null },
+      snowOpp: { score: 17, label: 'کم' },
+      timeline: [],
+      stale: false,
+      updatedAt: Date.now(),
+      lateDay: false,
+      technical: tech,
+      technicalLabel: '۲۹ مهر',
+      dateLabel: 'امروز',
+    });
+    // the grid limitation and the height correction must live inside the
+    // collapsed block, never in the visible part
+    const visible = html.split('<details')[0];
+    assert.ok(!visible.includes('سلول شبکه'), 'grid jargon must not be in the visible part');
+    assert.ok(!visible.includes('۳۵۲۷'), 'DEM altitude must not be in the visible part');
+    assert.ok(html.includes('جزئیات فنی محاسبه'), 'the technical layer must exist');
   });
 });
 
