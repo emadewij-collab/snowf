@@ -46,7 +46,14 @@ const PRECACHE = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(STATIC_CACHE).then((cache) => cache.addAll(PRECACHE)).then(() => self.skipWaiting()).catch(() => {})
+    caches
+      .open(STATIC_CACHE)
+      // `cache: 'reload'` bypasses the HTTP cache: the precache must hold the
+      // files that are on the server RIGHT NOW, not whatever the browser
+      // happens to have cached (GitHub Pages sends max-age=600).
+      .then((cache) => cache.addAll(PRECACHE.map((u) => new Request(u, { cache: 'reload' }))))
+      .then(() => self.skipWaiting())
+      .catch(() => {})
   );
 });
 
@@ -55,6 +62,9 @@ self.addEventListener('activate', (event) => {
     caches
       .keys()
       .then((keys) => Promise.all(keys.filter((k) => k.startsWith('snowf-') && k !== STATIC_CACHE && k !== CDN_CACHE).map((k) => caches.delete(k))))
+      // Drop the CDN cache too: its entries are versioned URLs, and a stale
+      // Tailwind/Lucide build would break the new markup.
+      .then(() => caches.delete(CDN_CACHE))
       .then(() => self.clients.claim())
   );
 });
@@ -114,7 +124,9 @@ self.addEventListener('fetch', (event) => {
     }
     event.respondWith(
       caches.match(req).then((hit) => {
-        const network = fetch(req)
+        // Background refresh: bypass the HTTP cache so the stored copy is
+        // genuinely the newest one, not a 10-minute-old browser cache entry.
+        const network = fetch(new Request(req, { cache: 'reload' }))
           .then((res) => {
             if (res && res.ok) store(STATIC_CACHE, req, res);
             return res;
