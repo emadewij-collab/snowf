@@ -1,12 +1,19 @@
 /**
  * SnowF service worker — static-asset caching only.
  *
- *  - Same-origin GET (html/css/js/json/icons): cache-first, then network.
- *  - CDN libraries: stale-while-revalidate (opaque-safe).
- *  - Weather API: NEVER cached here (the app's own cache layer handles
- *    freshness + explicit "stored data" flags).
+ * Strategy per request:
+ *  - Same-origin GET  → stale-while-revalidate: the cached copy is served
+ *    immediately (offline-first) while a background request refreshes the
+ *    cache. This means a new release reaches users on their next visit
+ *    WITHOUT anyone having to bump a version constant by hand.
+ *  - Requests that explicitly opt out of caching (fetch(..., {cache:
+ *    'no-cache'})) — e.g. data/resorts.json — go network-first, so a
+ *    stale precached copy can never shadow fresh data.
+ *  - CDN libraries → stale-while-revalidate (opaque-safe).
+ *  - Weather API → NEVER intercepted; freshness is handled by the app's own
+ *    cache layer, which flags stored data explicitly.
  */
-const VERSION = 'snowf-v3-0-0';
+const VERSION = 'snowf-v3';
 const STATIC_CACHE = `${VERSION}-static`;
 const CDN_CACHE = `${VERSION}-cdn`;
 
@@ -52,6 +59,14 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+/** Put a response into a cache without letting a failure break the response. */
+function store(cacheName, request, response) {
+  try {
+    const copy = response.clone();
+    caches.open(cacheName).then((cache) => cache.put(request, copy));
+  } catch { /* quota / opaque response — ignore */ }
+}
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
@@ -60,18 +75,30 @@ self.addEventListener('fetch', (event) => {
   // Never intercept the weather API — freshness is handled by the app.
   if (url.hostname === 'api.open-meteo.com') return;
 
-  // Same-origin static assets: cache-first.
+  // Same-origin static assets: stale-while-revalidate.
   if (url.origin === self.location.origin) {
+    // The caller explicitly asked for a fresh copy → network first.
+    const noCache = req.cache === 'no-cache' || req.cache === 'reload' || req.cache === 'no-store';
+    if (noCache) {
+      event.respondWith(
+        fetch(req)
+          .then((res) => {
+            if (res && res.ok) store(STATIC_CACHE, req, res);
+            return res;
+          })
+          .catch(() => caches.match(req).then((hit) => hit || Response.error()))
+      );
+      return;
+    }
     event.respondWith(
-      caches.match(req, { ignoreSearch: false }).then((hit) => {
-        if (hit) return hit;
-        return fetch(req).then((res) => {
-          if (res && res.ok) {
-            const copy = res.clone();
-            caches.open(STATIC_CACHE).then((cache) => cache.put(req, copy));
-          }
-          return res;
-        });
+      caches.match(req).then((hit) => {
+        const network = fetch(req)
+          .then((res) => {
+            if (res && res.ok) store(STATIC_CACHE, req, res);
+            return res;
+          })
+          .catch(() => hit || Response.error());
+        return hit || network;
       })
     );
     return;
@@ -82,10 +109,7 @@ self.addEventListener('fetch', (event) => {
     caches.match(req).then((hit) => {
       const net = fetch(req)
         .then((res) => {
-          if (res && (res.ok || res.type === 'opaque')) {
-            const copy = res.clone();
-            caches.open(CDN_CACHE).then((cache) => cache.put(req, copy));
-          }
+          if (res && (res.ok || res.type === 'opaque')) store(CDN_CACHE, req, res);
           return res;
         })
         .catch(() => hit);

@@ -8,13 +8,15 @@
  *  - confidence + trend
  *
  * THE SAFETY OVERRIDE (hard rule): if safety is low, the verdict can NEVER
- * be GO — no matter how good the snow/quality is.
+ * be GO — no matter how good the snow/quality is. The resort verdict is
+ * additionally floored by the WORST station, so one dangerous station can
+ * never be averaged away by two calm ones.
  *
  * Pure module: no DOM, no network. Safe to unit-test in Node.
  */
 
-import { VERDICT, SKI_HOURS, CONFIDENCE, FLAGS } from './config.js';
-import { isNum, feelsLike, r0 } from './weather.js';
+import { VERDICT, SKI_HOURS, CONFIDENCE, FLAGS, SAFETY, MODEL } from './config.js';
+import { isNum, feelsLike, r0, inSkiWindow, haversineKm } from './weather.js';
 
 export const VERDICTS = {
   go: { id: 'go', icon: '🟢', label: 'مناسب برای اسکی', short: 'برو' },
@@ -25,11 +27,16 @@ export const VERDICTS = {
 /**
  * Final verdict for a resort-day (or location-day — same shape).
  * Single mode (no user profiles): one fixed, documented gate.
- * @param {object} a { ski, safety, depthCm, risk } (numbers or {score})
+ *
+ * @param {object} a
+ *   { ski, safety, depthCm, risk }  — resort-level numbers
+ *   { minSafety, minSafetyZone }    — worst station (independent safety floor)
+ *   { hardStops }                   — any hard stop anywhere in the resort
  */
 export function decide(a = {}) {
   const ski = num(a.ski);
   const safety = num(a.safety);
+  const minSafety = num(a.minSafety);
   const depth = isNum(a.depthCm) ? a.depthCm : null;
   const hardStops = a.hardStops || a.safetyHardStops || [];
   const riskBand = a.risk?.band || a.riskBand || 'low';
@@ -37,6 +44,7 @@ export function decide(a = {}) {
   const gate = {
     safetyMin: VERDICT.safetyCautionBelow,
     qualityMin: VERDICT.qualityCautionBelow,
+    stationSafetyMin: SAFETY.stationSafetyFloor.cautionBelow,
   };
   const reasons = [];
   let verdict = 'go';
@@ -56,6 +64,12 @@ export function decide(a = {}) {
     reasons.push(`ایمنی پایین (${safety}/۱۰۰)`);
     return { verdict: 'avoid', ...VERDICTS.avoid, reasons, safetyGate: true, gate };
   }
+  // 2b) Worst-station safety floor → AVOID, even if the average looks fine.
+  if (isNum(minSafety) && minSafety < SAFETY.stationSafetyFloor.avoidBelow) {
+    const where = a.minSafetyZone ? ` (${a.minSafetyZone})` : '';
+    reasons.push(`ایمنی یکی از ایستگاه‌ها بسیار پایین است${where} (${minSafety}/۱۰۰)`);
+    return { verdict: 'avoid', ...VERDICTS.avoid, reasons, safetyGate: true, gate };
+  }
   // 3) No snow → AVOID (likely thin cover / closed).
   if (depth !== null && depth < VERDICT.minDepthCm) {
     reasons.push(`برف ناکافی (${depth} سانتی‌متر) — احتمال بسته بودن پیست`);
@@ -69,6 +83,12 @@ export function decide(a = {}) {
   // 5) Safety caution zone → at most CAUTION.
   if (isNum(safety) && safety < gate.safetyMin) {
     reasons.push(`ایمنی ${safety}/۱۰ — برای رأی «برو» حداقل ${gate.safetyMin} لازم است`);
+    verdict = 'caution';
+  }
+  // 5b) Worst-station safety floor → at most CAUTION.
+  if (isNum(minSafety) && minSafety < gate.stationSafetyMin) {
+    const where = a.minSafetyZone ? ` (${a.minSafetyZone})` : '';
+    reasons.push(`ایمنی ضعیف‌ترین ایستگاه${where} (${minSafety}/۱۰۰) — حداقل ${gate.stationSafetyMin} لازم است`);
     verdict = 'caution';
   }
   // 6) Quality caution zone → at most CAUTION.
@@ -87,7 +107,7 @@ export function decide(a = {}) {
     verdict,
     ...VERDICTS[verdict],
     reasons,
-    safetyGate: verdict !== 'go' && isNum(safety) && safety < gate.safetyMin,
+    safetyGate: verdict !== 'go' && ((isNum(safety) && safety < gate.safetyMin) || (isNum(minSafety) && minSafety < gate.stationSafetyMin)),
     gate,
   };
 }
@@ -149,13 +169,17 @@ export function hourlySkiScore(h = {}, depthCm = null) {
 
 /**
  * Best contiguous ski window within SKI_HOURS.
+ * The window is HALF-OPEN: `start` inclusive, `end` exclusive, so a window
+ * of 07:00–16:00 contains the hourly rows 07:00 … 15:00 and is labelled
+ * "07:00 تا 16:00" (never one hour past the end).
+ *
  * @param {Array} hours normalized hour rows (full day)
  * @param {number|null} fromHour skip past hours for "today"
  * @param {number|null} depthCm
  */
 export function findBestWindow(hours = [], fromHour = null, depthCm = null, window = SKI_HOURS) {
   const rows = hours
-    .filter((r) => isNum(r.hour) && r.hour >= window.start && r.hour <= window.end && (fromHour === null || r.hour >= fromHour))
+    .filter((r) => inSkiWindow(r.hour, window) && (fromHour === null || r.hour >= fromHour))
     .map((r) => ({ ...r, hs: hourlySkiScore(r, depthCm) }));
   if (!rows.length) {
     return { available: false, reason: 'ساعت‌های اسکی امروز گذشته است — فردا را بررسی کن' };
@@ -217,7 +241,15 @@ function avg(a) {
 // Best elevation
 // ---------------------------------------------------------------------------
 
-/** Pick the best station for the day + explain the gap. */
+/**
+ * Pick the best station for the day + explain the gap.
+ *
+ * HONESTY NOTE: Open-Meteo serves a ~11 km grid. Two stations of the same
+ * resort frequently land in the SAME grid cell, in which case they share
+ * wind, cloud and precipitation and differ only by the interpolated
+ * temperature. We detect that and say so instead of presenting an
+ * artefact as a real elevation difference.
+ */
 export function bestElevation(locationAnalyses = []) {
   const ok = locationAnalyses.filter((a) => a && !a.failed);
   if (!ok.length) return { available: false, reason: 'داده‌ای موجود نیست' };
@@ -260,8 +292,48 @@ export function bestElevation(locationAnalyses = []) {
     shortFa: winner.a.shortFa,
     verdict: winner.d.verdict,
     reasons,
+    /** True when the stations share a model grid cell (weak signal). */
+    sharedCell: sharedGridCell(ok),
     ranking: ranked.map((r) => ({ zone: r.a.zone, shortFa: r.a.shortFa, ski: r.a.ski.score, safety: r.a.safety.score, verdict: r.d.verdict })),
   };
+}
+
+/**
+ * Do the given stations resolve to the SAME model grid cell (or so close
+ * together that they are effectively one measurement)?
+ *
+ * If so, their wind/precipitation are literally the same numbers and the
+ * "best elevation" ranking carries no independent information.
+ *
+ * A pair counts as non-independent when EITHER:
+ *   • both land in the same model grid cell, OR
+ *   • they are closer than MODEL.independenceKm horizontally AND closer
+ *     than MODEL.independenceM in altitude.
+ */
+export function sharedGridCell(analyses = []) {
+  const ok = (analyses || []).filter((a) => a && !a.failed);
+  if (ok.length < 2) return false;
+
+  const cellOf = (a) =>
+    a.grid && isNum(a.grid.lat) && isNum(a.grid.lon)
+      ? `${a.grid.lat.toFixed(3)},${a.grid.lon.toFixed(3)}`
+      : null;
+
+  for (let i = 0; i < ok.length; i++) {
+    for (let j = i + 1; j < ok.length; j++) {
+      const ci = cellOf(ok[i]);
+      const cj = cellOf(ok[j]);
+      if (ci && cj && ci === cj) return true; // same cell
+
+      // Different cells, but too close to be independent readings.
+      const dKm = haversineKm(ok[i].grid?.lat, ok[i].grid?.lon, ok[j].grid?.lat, ok[j].grid?.lon);
+      const dAlt = isNum(ok[i].alt) && isNum(ok[j].alt) ? Math.abs(ok[i].alt - ok[j].alt) : null;
+      if (isNum(dKm) && isNum(dAlt) && dKm < MODEL.independenceKm && dAlt < MODEL.independenceM) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -311,8 +383,11 @@ export function explainWhy({ ski = null, safety = null, snow = null, risk = null
 // Confidence + trend
 // ---------------------------------------------------------------------------
 
-/** Confidence in a recommendation (data completeness + horizon). NOT a probability. */
-export function confidenceFor({ dayIndex = 0, missingVars = 0, stale = false, contradiction = false, lateDay = false } = {}) {
+/**
+ * Confidence in a recommendation (data completeness + horizon). NOT a probability.
+ * @param {object} o { dayIndex, missingVars, stale, contradiction, lateDay, sharedCell }
+ */
+export function confidenceFor({ dayIndex = 0, missingVars = 0, stale = false, contradiction = false, lateDay = false, sharedCell = false } = {}) {
   const band = CONFIDENCE.horizon.find((b) => dayIndex <= b.maxDay) || CONFIDENCE.horizon[CONFIDENCE.horizon.length - 1];
   let pct = band.base;
   const notes = [];
@@ -332,6 +407,10 @@ export function confidenceFor({ dayIndex = 0, missingVars = 0, stale = false, co
   if (lateDay) {
     pct -= CONFIDENCE.stalePenalty;
     notes.push('ساعات اسکی امروز کامل نیست');
+  }
+  if (sharedCell) {
+    pct -= CONFIDENCE.sharedCellPenalty;
+    notes.push('ایستگاه‌ها روی یک سلول شبکه‌ی مدل قرار دارند');
   }
   pct = Math.max(5, Math.min(98, Math.round(pct)));
   const label = pct >= 75 ? 'بالا' : pct >= 55 ? 'متوسط' : 'کم';

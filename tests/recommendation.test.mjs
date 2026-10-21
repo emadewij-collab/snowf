@@ -32,6 +32,45 @@ describe('decide (SAFETY OVERRIDE)', () => {
     const d = decide({ ski: 60, safety: 90, depthCm: 3, hardStops: [] });
     assert.equal(d.verdict, 'avoid');
   });
+
+  it('unknown depth (null) does NOT trigger the depth gate', () => {
+    const d = decide({ ski: 70, safety: 90, depthCm: null, hardStops: [] });
+    assert.notEqual(d.verdict, 'avoid');
+  });
+});
+
+describe('decide — worst-station safety floor', () => {
+  it('one dangerous station → AVOID even when the average is perfect', () => {
+    const d = decide({
+      ski: 90, safety: 92, minSafety: 28, minSafetyZone: 'قله',
+      depthCm: 70, hardStops: [], riskBand: 'low',
+    });
+    assert.equal(d.verdict, 'avoid');
+    assert.equal(d.safetyGate, true);
+    assert.ok(d.reasons.some((r) => r.includes('قله')));
+  });
+
+  it('one weak station → at most CAUTION', () => {
+    const d = decide({
+      ski: 90, safety: 88, minSafety: 45, minSafetyZone: 'میانی',
+      depthCm: 70, hardStops: [], riskBand: 'low',
+    });
+    assert.equal(d.verdict, 'caution');
+    assert.equal(d.safetyGate, true);
+  });
+
+  it('all stations healthy → the floor does not interfere', () => {
+    const d = decide({
+      ski: 90, safety: 88, minSafety: 80, minSafetyZone: 'قله',
+      depthCm: 70, hardStops: [], riskBand: 'low',
+    });
+    assert.equal(d.verdict, 'go');
+  });
+
+  it('no station data → the floor does not interfere', () => {
+    const d = decide({ ski: 90, safety: 88, minSafety: null, depthCm: 70, hardStops: [], riskBand: 'low' });
+    assert.equal(d.verdict, 'go');
+  });
 });
 
 describe('hourlySkiScore + findBestWindow', () => {
@@ -60,6 +99,21 @@ describe('hourlySkiScore + findBestWindow', () => {
     const w = findBestWindow(hours, 18, 50);
     assert.equal(w.available, false);
   });
+
+  it('never labels a window past the configured end (16:00 → "تا 16:00")', () => {
+    const hours = [];
+    for (let h = 0; h < 24; h++) hours.push(calmHour(h));
+    const w = findBestWindow(hours, null, 50);
+    assert.ok(w.end <= 16, `end=${w.end}`);
+    assert.ok(w.label.includes('16:00'), w.label);
+  });
+
+  it('the closing hour 16:00 itself is not part of the window', () => {
+    const hours = [];
+    for (let h = 0; h < 24; h++) hours.push(h === 16 ? stormHour(h) : calmHour(h));
+    const w = findBestWindow(hours, null, 50);
+    assert.ok(w.end <= 16, `end=${w.end}`);
+  });
 });
 
 describe('bestElevation', () => {
@@ -79,6 +133,21 @@ describe('bestElevation', () => {
     bad.safety.hardStops = [{ id: 'gust', label: 'x' }];
     const r = bestElevation([bad, loc('mid', 50, 70)]);
     assert.equal(r.zone, 'mid');
+  });
+  it('flags stations that share one model grid cell', () => {
+    const cell = { lat: 36.0552, lon: 51.3857, elevation: 2896 };
+    const a = loc('summit', 80, 80); a.grid = cell;
+    const b = loc('mid', 60, 70); b.grid = { ...cell };
+    const c = loc('low', 50, 60); c.grid = { lat: 36.0844, lon: 51.4252, elevation: 3146 };
+    const r = bestElevation([a, b, c]);
+    assert.equal(r.sharedCell, true, 'two of three stations share a cell');
+  });
+  it('independent stations are not flagged', () => {
+    const a = loc('summit', 80, 80); a.grid = { lat: 36.0552, lon: 51.3857, elevation: 2896 };
+    const b = loc('mid', 60, 70); b.grid = { lat: 36.0428, lon: 51.4118, elevation: 2969 };
+    const c = loc('low', 50, 60); c.grid = { lat: 36.0844, lon: 51.4252, elevation: 3146 };
+    const r = bestElevation([a, b, c]);
+    assert.equal(r.sharedCell, false);
   });
 });
 
@@ -106,6 +175,12 @@ describe('confidenceFor', () => {
     const b = confidenceFor({ dayIndex: 1, missingVars: 3, stale: true });
     assert.ok(b.pct < a.pct);
     assert.ok(b.notes.length >= 2);
+  });
+  it('stations sharing a model grid cell lower the confidence', () => {
+    const a = confidenceFor({ dayIndex: 1 });
+    const b = confidenceFor({ dayIndex: 1, sharedCell: true });
+    assert.ok(b.pct < a.pct);
+    assert.ok(b.notes.some((n) => n.includes('سلول شبکه')));
   });
 });
 

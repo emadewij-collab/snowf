@@ -4,6 +4,7 @@
   "description": "امروز کجا بریم اسکی؟ مقایسه توچال، دیزین، دربندسر و شمشک",
   "lang": "fa",
   "dir": "rtl",
+  "id": "/snowf/",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",

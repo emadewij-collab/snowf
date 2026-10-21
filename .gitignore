@@ -1,2 +1,8 @@
 .DS_Store
 *.log
+node_modules/
+.env
+.env.*
+Thumbs.db
+.vscode/
+.idea/

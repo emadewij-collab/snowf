@@ -9,6 +9,10 @@
  * a combined quality/safety blend — a dangerous powder day can never outrank
  * a safe good day.
  *
+ * Every candidate may carry `minSafety` / `minSafetyZone` (the worst station
+ * of that resort-day). The verdict engine treats it as an independent floor,
+ * so a resort with one dangerous station cannot be crowned on its average.
+ *
  * Pure module: no DOM, no network. Safe to unit-test in Node.
  */
 
@@ -19,21 +23,31 @@ import { decide } from './recommendation.js';
 const VERDICT_ORDER = { go: 0, caution: 1, avoid: 2 };
 
 /** Combined resort-day number used only to order WITHIN the same verdict. */
-export function blendScore(ski, safety) {
+function blendScore(ski, safety) {
   const q = isNum(ski) ? ski : 0;
   const s = isNum(safety) ? safety : 0;
   return Math.round(q * 0.6 + s * 0.4);
 }
 
-/**
- * Rank analyzed resort-days for "where should we go?".
- * @param {Array} list of analyzeResortDay outputs (+ verdict attached by caller or here)
- */
-export function rankResorts(list = []) {
+/** Build the verdict for one candidate row (shared by every ranking). */
+function verdictFor(row) {
+  return decide({
+    ski: row.ski,
+    safety: row.safety,
+    minSafety: row.minSafety,
+    minSafetyZone: row.minSafetyZone,
+    depthCm: row.depthCm,
+    hardStops: row.hardStops,
+    riskBand: row.risk?.band,
+  });
+}
+
+/** Attach verdict + blend + medal to a list of rows, sorted best-first. */
+function rankRows(list = []) {
   const rows = list
     .filter((r) => r && !r.failed)
     .map((r) => {
-      const d = r.verdict || decide({ ski: r.ski, safety: r.safety, depthCm: r.depthCm, hardStops: r.hardStops, riskBand: r.risk?.band });
+      const d = r.verdict && r.verdict.verdict ? r.verdict : verdictFor(r);
       return { ...r, verdict: d, blend: blendScore(r.ski, r.safety) };
     })
     .sort((a, b) => VERDICT_ORDER[a.verdict.verdict] - VERDICT_ORDER[b.verdict.verdict] || b.blend - a.blend);
@@ -46,23 +60,19 @@ export function rankResorts(list = []) {
 }
 
 /**
+ * Rank analyzed resort-days for "where should we go?".
+ * @param {Array} list of analyzeResortDay outputs (+ verdict attached by caller or here)
+ */
+export function rankResorts(list = []) {
+  return rankRows(list);
+}
+
+/**
  * Rank future days for ONE resort (best ski days ahead).
  * @param {Array} days array of { dayIndex, date, ski, safety, snowScore, fresh, wind, visKm, depthCm, risk, hardStops }
  */
 export function rankDays(days = [], topN = 3) {
-  const rows = days
-    .filter((d) => d && isNum(d.ski))
-    .map((d) => {
-      const v = decide({ ski: d.ski, safety: d.safety, depthCm: d.depthCm, hardStops: d.hardStops, riskBand: d.risk?.band });
-      return { ...d, verdict: v, blend: blendScore(d.ski, d.safety) };
-    })
-    .sort((a, b) => VERDICT_ORDER[a.verdict.verdict] - VERDICT_ORDER[b.verdict.verdict] || b.blend - a.blend);
-  const medals = ['🥇', '🥈', '🥉'];
-  rows.forEach((r, i) => {
-    r.medal = medals[i] || `${i + 1}.`;
-    r.rank = i + 1;
-  });
-  return rows.slice(0, topN);
+  return rankRows(days).slice(0, topN);
 }
 
 /**
@@ -126,13 +136,7 @@ export function snowOpportunity(ctx = {}) {
  * @param {Array} candidates [{ resortId, nameFa, dayIndex, date, ski, safety, snowScore, fresh, wind, gust, visKm, depthCm, risk, hardStops, window }]
  */
 export function findBestPick(candidates = []) {
-  const rows = candidates
-    .filter((c) => c && isNum(c.ski))
-    .map((c) => {
-      const v = decide({ ski: c.ski, safety: c.safety, depthCm: c.depthCm, hardStops: c.hardStops, riskBand: c.risk?.band });
-      return { ...c, verdict: v, blend: blendScore(c.ski, c.safety) };
-    })
-    .sort((a, b) => VERDICT_ORDER[a.verdict.verdict] - VERDICT_ORDER[b.verdict.verdict] || b.blend - a.blend);
+  const rows = rankRows(candidates);
   if (!rows.length) return null;
   const best = rows[0];
   const reasons = [];
@@ -155,6 +159,7 @@ export function compareTableRows(ranked = []) {
     verdict: r.verdict,
     ski: r.ski,
     safety: r.safety,
+    minSafety: r.minSafety,
     snow: r.snowScore,
     wind: r.wind,
     gust: r.gust,

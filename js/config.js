@@ -21,9 +21,10 @@
 export const APP = {
   nameFa: 'برف‌کو',
   nameEn: 'SnowF',
-  version: 'v3.1',
+  // Single source of truth for the app version. `package.json` must match
+  // (verified by CI). The footer renders it at runtime — never hardcode it.
+  version: '3.2.0',
   timezone: 'Asia/Tehran',
-  locale: 'fa-IR',
   dataSource: 'Open-Meteo',
   forecastDays: 16,
 };
@@ -35,8 +36,67 @@ export const STALE_OK_MS = 6 * 60 * 60 * 1000; // accept stale cache offline up 
 export const SKI_HOURS = { start: 7, end: 16, minWindowHours: 2 };
 
 // ---------------------------------------------------------------------------
+// WEATHER MODEL / GRID
+//
+// Open-Meteo serves NWP output on a ~9–11 km grid. A ski resort spans less
+// than 2 km, so ALL of its stations usually land in the SAME grid cell and
+// therefore share wind / precipitation / cloud. The ONLY variable the model
+// resolves per requested point is temperature, via a height correction
+// against the DEM elevation of the requested coordinate.
+//
+// Consequences we design around:
+//   • Temperature → corrected to the true station altitude (see HEIGHT).
+//   • Everything else → shared between stations in the same cell; we detect
+//     the collision and disclose it instead of pretending we have 3 readings.
+//
+// `models` is passed to Open-Meteo verbatim. 'best_match' lets Open-Meteo
+// pick the most suitable model per location (default, best accuracy).
+// ---------------------------------------------------------------------------
+export const MODEL = {
+  name: 'best_match',
+  /** Nominal horizontal grid spacing in km (used only for user-facing notes). */
+  gridKm: 11,
+  /** Minimum horizontal distance (km) that makes two stations "independent". */
+  independenceKm: 3,
+  /** Max vertical gap (m) between two stations that we still call distinct. */
+  independenceM: 120,
+};
+
+// ---------------------------------------------------------------------------
+// HEIGHT CORRECTION (temperature only)
+//
+// Open-Meteo already corrects temperature to the DEM elevation of the
+// requested coordinate, using a standard dry-air lapse rate. We reproduce
+// that rate so we can move the value the remaining distance to the TRUE
+// station altitude (the resort's official elevation, not the DEM's).
+//
+//   T_true = T_api + (stationAlt - demAlt) * LAPSE_RATE
+//
+// Verified empirically against Open-Meteo: two points in the SAME grid cell
+// whose DEM elevations differ by 151 m reported a 1.0 °C difference
+// (= 6.6 °C/km), which matches LAPSE_RATE.
+//
+// Applied ONLY to thermodynamic variables (temperature, apparent
+// temperature, dew point). Never to wind, precipitation, cloud, visibility,
+// snow depth or freezing level — those are either grid fields or already
+// elevation-aware in a different way.
+// ---------------------------------------------------------------------------
+export const HEIGHT = {
+  /** Dry-air lapse rate used by Open-Meteo for its own height correction. */
+  lapseRate: 0.0065, // °C per metre
+  /** Variables that are shifted by the height correction. */
+  applyTo: ['temperature_2m', 'apparent_temperature', 'dew_point_2m'],
+  /** Ignore the correction below this |Δ| (m) — DEM noise, not worth shifting. */
+  minDeltaM: 25,
+};
+
+// ---------------------------------------------------------------------------
 // Weights: how the 3 elevation stations combine into ONE resort score.
 // Summit matters most (best snow), mid second, base least.
+//
+// NOTE: these weights only matter when the stations are actually
+// independent. Stations sharing a model grid cell carry near-identical
+// data, so the weighted average is a de-duplicated read, not three votes.
 // ---------------------------------------------------------------------------
 export const ELEVATION_WEIGHTS = { summit: 0.45, mid: 0.35, low: 0.2 };
 
@@ -195,7 +255,9 @@ export const SAFETY = {
     { max: Infinity, points: -20 },
   ],
 
-  rainOnSnow: { rainMin: 2, depthMin: 15, points: -15, mildPoints: -6, mildRainMin: 0.5 },
+  // Rain-on-snow penalties. The detection thresholds live in FLAGS.rainOnSnow
+  // (single source of truth) — this block only holds the score impact.
+  rainOnSnow: { points: -15, mildPoints: -6 },
   freezingRain: { points: -25 }, // estimated, never asserted as certain
   warming24h: [
     { min: 8, points: -12 },
@@ -232,6 +294,19 @@ export const SAFETY = {
     visibilityKm: 0.5,
     freezingRainStrong: true,
   },
+
+  // ---------------------------------------------------------------------
+  // WORST-STATION GATE.
+  // The resort score is a weighted average, which can hide ONE dangerous
+  // station behind two calm ones. The minimum safety across stations is
+  // therefore a separate, independent floor on the resort verdict.
+  // ---------------------------------------------------------------------
+  stationSafetyFloor: {
+    // Below this, the resort cannot be called "go" even if the average is high.
+    cautionBelow: 55,
+    // Below this, the resort is AVOID no matter how good the average looks.
+    avoidBelow: 35,
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -248,7 +323,7 @@ export const RISK = {
   intensityRate: { min: 2, points: 1 }, // cm/h
   windLoading: { freshMin: 8, gustHigh: 55, gustMid: 40, highPoints: 2, midPoints: 1 },
   warming24h: { min: 8, points: 1 },
-  rainOnSnow: { rainMin: 2, points: 2 },
+  rainOnSnow: { rainMin: 2, depthMin: 15, points: 2 },
   freezingLevelAboveStation: { points: 1 },
   lowVisibility: { maxKm: 1, points: 1 },
   bands: [
@@ -271,6 +346,10 @@ export const VERDICT = {
   qualityAvoidBelow: 30, // quality < 30 → AVOID (miserable, not worth it)
   qualityCautionBelow: 50, // quality < 50 → at most CAUTION
   minDepthCm: 8, // below → AVOID with "likely closed / thin cover" note
+  // Depth is checked on the BEST available station, not only the summit:
+  // a wind-scoured summit must not condemn a resort whose mid station has
+  // 60 cm of snow. `null` depth (unknown) never triggers the gate.
+  depthFrom: 'best',
 };
 
 // ---------------------------------------------------------------------------
@@ -296,7 +375,7 @@ export const OPPORTUNITY = {
     { max: Infinity, points: -10 },
   ],
   persistence: { points: 8 }, // next-day max stays cold → snow lasts
-  windAffectedCap: 55, // heavy snow + strong wind → capped (wind-affected day)
+  windAffectedCap: 55, // heavy snow + strong wind → capped (wind-affected)
   windAffected: { freshMin: 8, gustMin: 55 },
 };
 
@@ -315,13 +394,18 @@ export const CONFIDENCE = {
   missingVarMaxPenalty: 18,
   stalePenalty: 10,
   contradictionPenalty: 5,
+  // Stations that share a model grid cell are not independent readings.
+  sharedCellPenalty: 8,
 };
 
 // ---------------------------------------------------------------------------
 // Detection thresholds (flags shown as estimates / likelihoods)
 // ---------------------------------------------------------------------------
 export const FLAGS = {
-  rainOnSnow: { rainMm: 0.5, depthCm: 10 },
+  // rainMm  = rain needed for the flag at all
+  // severeRainMm = rain from which the flag counts as "severe"
+  // depthCm = snow depth needed for a snowpack to exist
+  rainOnSnow: { rainMm: 0.5, severeRainMm: 2, depthCm: 10 },
   refreeze: { prevDayMaxAbove: 0.5, nightMinBelow: -1, morningBelow: 0 },
   windLoading: { freshMin: 8, gustMin: 40 },
   freezingRain: { precipMin: 0.5, tempMin: -3, tempMax: 0.5, humidityMin: 88 },

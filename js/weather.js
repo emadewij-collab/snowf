@@ -5,15 +5,16 @@
  * Everything flows through here first:
  *   - safe getters (missing data → null, never crash, never fake numbers)
  *   - day/hour alignment (hourly rows grouped by local calendar day)
+ *   - height correction (model temperature → true station altitude)
  *   - derived metrics (ski-window aggregates, trends, feels-like, …)
  *
  * Pure module: no DOM, no network. Safe to unit-test in Node.
  */
 
-import { SKI_HOURS } from './config.js';
+import { HEIGHT, SKI_HOURS } from './config.js';
 
 // Hourly variables we rely on (used for the data-quality report).
-export const KEY_HOURLY_VARS = [
+const KEY_HOURLY_VARS = [
   'temperature_2m',
   'apparent_temperature',
   'precipitation',
@@ -30,7 +31,7 @@ export const KEY_HOURLY_VARS = [
   'freezing_level_height',
 ];
 
-export const KEY_DAILY_VARS = [
+const KEY_DAILY_VARS = [
   'temperature_2m_max',
   'temperature_2m_min',
   'snowfall_sum',
@@ -74,6 +75,37 @@ export function assessDataQuality(data) {
 }
 
 /**
+ * Grid metadata of the model cell the request snapped to.
+ * Two stations that land on the SAME cell receive the same wind, cloud and
+ * precipitation — only temperature is resolved per requested point.
+ */
+export function gridInfo(data) {
+  return {
+    lat: isNum(data?.latitude) ? data.latitude : null,
+    lon: isNum(data?.longitude) ? data.longitude : null,
+    elevation: isNum(data?.elevation) ? data.elevation : null,
+  };
+}
+
+/** Stable key for a model grid cell (null when unknown). */
+export function gridCellKey(grid) {
+  if (!grid || !isNum(grid.lat) || !isNum(grid.lon)) return null;
+  return `${grid.lat.toFixed(4)},${grid.lon.toFixed(4)}`;
+}
+
+/** Great-circle-ish distance in km (good enough for < 50 km). */
+export function haversineKm(aLat, aLon, bLat, bLon) {
+  if (![aLat, aLon, bLat, bLon].every(isNum)) return null;
+  const R = 6371;
+  const dLat = ((bLat - aLat) * Math.PI) / 180;
+  const dLon = ((bLon - aLon) * Math.PI) / 180;
+  const la1 = (aLat * Math.PI) / 180;
+  const la2 = (bLat * Math.PI) / 180;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/**
  * Build an index: local date string (YYYY-MM-DD) → { start, end } hourly indices.
  * Open-Meteo hourly[].time entries look like "2026-10-07T00:00" (local ISO, no zone).
  */
@@ -90,10 +122,53 @@ export function buildDayIndex(hourlyTimes) {
 }
 
 /**
+ * HEIGHT CORRECTION.
+ *
+ * Open-Meteo corrects temperature to the DEM elevation of the requested
+ * coordinate. We want the temperature at the resort's OFFICIAL station
+ * altitude, which the DEM may represent several tens of metres away from.
+ *
+ *   ΔT = -(stationAlt - demAlt) * lapseRate
+ *
+ * The sign is negative on purpose: a station that sits HIGHER than the DEM
+ * point must be COLDER. (Verified against Open-Meteo: two points in the same
+ * grid cell whose DEM elevations differ by 151 m reported a 1.0 °C
+ * difference — a 6.6 °C/km lapse rate, matching LAPSE_RATE.)
+ *
+ * Only thermodynamic variables are shifted (see HEIGHT.applyTo).
+ *
+ * @param {object} data Open-Meteo payload
+ * @param {number|null} targetAlt official station altitude in metres
+ * @returns {{ delta: number, applied: boolean, demAlt: number|null, targetAlt: number|null }}
+ */
+export function heightCorrection(data, targetAlt) {
+  const demAlt = isNum(data?.elevation) ? data.elevation : null;
+  const target = isNum(targetAlt) ? targetAlt : null;
+  if (demAlt === null || target === null) {
+    return { delta: 0, applied: false, demAlt, targetAlt: target };
+  }
+  const diffM = target - demAlt;
+  if (Math.abs(diffM) < HEIGHT.minDeltaM) {
+    return { delta: 0, applied: false, demAlt, targetAlt: target };
+  }
+  return {
+    // higher station → negative (colder) shift
+    delta: Math.round(-diffM * HEIGHT.lapseRate * 1000) / 1000,
+    applied: true,
+    demAlt: Math.round(demAlt),
+    targetAlt: target,
+  };
+}
+
+/**
  * Build 24 (or fewer) normalized hour rows for daily[dayIndex].
  * Missing values stay `null` — callers must handle nulls explicitly.
+ *
+ * @param {object} data Open-Meteo payload
+ * @param {number} dayIndex index into daily.time
+ * @param {object} opts { targetAlt } — station altitude for the height correction
  */
-export function buildDayHours(data, dayIndex) {
+export function buildDayHours(data, dayIndex, opts = {}) {
   const hours = [];
   if (!data || !data.hourly || !data.daily || !Array.isArray(data.daily.time)) return hours;
   const dayStr = data.daily.time[dayIndex];
@@ -104,16 +179,19 @@ export function buildDayHours(data, dayIndex) {
   if (!range) return hours;
 
   const h = data.hourly;
+  const hc = heightCorrection(data, opts.targetAlt ?? null);
+  const shift = hc.applied ? hc.delta : 0;
+
   for (let i = range.start; i <= range.end; i++) {
     const t = h.time[i] || '';
     hours.push({
       idx: i,
       time: t,
       hour: t.length >= 13 ? Number(t.slice(11, 13)) : null,
-      temp: get(h.temperature_2m, i),
-      appTemp: get(h.apparent_temperature, i),
+      temp: shifted(get(h.temperature_2m, i), shift),
+      appTemp: shifted(get(h.apparent_temperature, i), shift),
       humidity: get(h.relative_humidity_2m, i),
-      dewPoint: get(h.dew_point_2m, i),
+      dewPoint: shifted(get(h.dew_point_2m, i), shift),
       precip: get(h.precipitation, i),
       prob: get(h.precipitation_probability, i),
       rain: get(h.rain, i),
@@ -138,6 +216,13 @@ export function buildDayHours(data, dayIndex) {
     else r.visKm = null;
   }
   return hours;
+}
+
+/** Shift a value by the height correction (null-safe). */
+function shifted(v, delta) {
+  if (!isNum(v)) return v;
+  if (!delta) return v;
+  return Math.round((v + delta) * 100) / 100;
 }
 
 /** Daily aggregates for one day (safe, null-tolerant). */
@@ -168,7 +253,7 @@ export function buildDaySummary(data, dayIndex) {
  * Canadian wind-chill (°C). Only meaningful for temp<=10 & wind>=4.8.
  * Returns null when inputs are missing.
  */
-export function windChill(tempC, windKmh) {
+function windChill(tempC, windKmh) {
   if (!isNum(tempC) || !isNum(windKmh)) return null;
   if (tempC > 10 || windKmh < 4.8) return Math.round(tempC * 10) / 10;
   const v = Math.pow(windKmh, 0.16);
@@ -184,13 +269,24 @@ export function feelsLike(tempC, appTempC, windKmh) {
 }
 
 /**
+ * Is this hour inside the ski window?
+ *
+ * The window is HALF-OPEN: `start` inclusive, `end` exclusive. A window of
+ * 07:00–16:00 therefore contains the hourly rows 07:00 … 15:00 — the 16:00
+ * row already describes the hour 16:00→17:00, which is past the end.
+ */
+export function inSkiWindow(hour, window = SKI_HOURS) {
+  return isNum(hour) && hour >= window.start && hour < window.end;
+}
+
+/**
  * Aggregate the ski window (default 07:00–16:00) from hour rows.
  * @param {Array} hours hour rows from buildDayHours
  * @param {number|null} fromHour for "today": ignore past hours (null = whole window)
  */
 export function summarizeSkiWindow(hours, fromHour = null, window = SKI_HOURS) {
   const rows = hours.filter(
-    (r) => isNum(r.hour) && r.hour >= window.start && r.hour <= window.end && (fromHour === null || r.hour >= fromHour)
+    (r) => inSkiWindow(r.hour, window) && (fromHour === null || r.hour >= fromHour)
   );
   const pick = (fn) => rows.map(fn).filter(isNum);
   const sum = (a) => a.reduce((x, y) => x + y, 0);
@@ -238,19 +334,56 @@ export function tempRise24h(data, dayIndex) {
   return Math.round((cur - prev) * 10) / 10;
 }
 
-/** Fresh snow over trailing 24h ending at dayIndex (uses daily sums). */
-export function freshSnowTrailing(data, dayIndex, days = 2) {
-  if (!data || !data.daily || !Array.isArray(data.daily.snowfall_sum)) return null;
+/**
+ * Trailing 24h sum of an hourly variable, ending at `endIndex`.
+ * This is the TRUE "last 24 hours" (it may cross a day boundary), which is
+ * what "برف تازه ۲۴ساعته" should mean — the daily sum of a forecast day is
+ * a calendar day, not a trailing window.
+ *
+ * @returns {number|null} null when no numeric value is available at all
+ */
+export function trailing24hSum(arr, endIndex, len = 24) {
+  if (!Array.isArray(arr)) return null;
+  if (!Number.isInteger(endIndex) || endIndex < 0 || endIndex >= arr.length) return null;
+  const start = Math.max(0, endIndex - len + 1);
   let total = 0;
   let found = false;
-  for (let d = Math.max(0, dayIndex - days + 1); d <= dayIndex; d++) {
-    const v = data.daily.snowfall_sum[d];
+  for (let i = start; i <= endIndex; i++) {
+    const v = arr[i];
     if (isNum(v)) {
       total += v;
       found = true;
     }
   }
   return found ? Math.round(total * 10) / 10 : null;
+}
+
+/**
+ * Index of the last hourly row of a given calendar day (null when unknown).
+ */
+export function dayEndIndex(data, dayIndex) {
+  if (!data || !data.hourly || !data.daily || !Array.isArray(data.daily.time)) return null;
+  const dayStr = data.daily.time[dayIndex];
+  if (!dayStr) return null;
+  const range = buildDayIndex(data.hourly.time).get(dayStr);
+  return range ? range.end : null;
+}
+
+/**
+ * Fresh snow over the trailing 24h ending at the end of the ski window of
+ * the given day (or at "now" for today).
+ *
+ * @param {object} data Open-Meteo payload
+ * @param {number} dayIndex
+ * @param {number|null} nowIndex current hour index (used for today)
+ * @returns {number|null} cm
+ */
+export function freshSnow24h(data, dayIndex, nowIndex = null) {
+  if (!data || !data.hourly) return null;
+  let end = dayEndIndex(data, dayIndex);
+  if (dayIndex === 0 && Number.isInteger(nowIndex) && nowIndex >= 0) end = nowIndex;
+  if (end === null) return null;
+  return trailing24hSum(data.hourly.snowfall, end, 24);
 }
 
 /**

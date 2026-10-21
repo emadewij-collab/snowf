@@ -1,10 +1,11 @@
-/**
+﻿/**
  * SnowF — UI rendering (string builders + tiny DOM helpers).
  * All user-facing text is Persian (RTL). Numbers use Persian digits.
  */
 
-import { APP, RISK } from './config.js';
+import { APP, RISK, MODEL } from './config.js';
 import { VERDICTS } from './recommendation.js';
+import { safetyLabel } from './safety.js';
 import { isNum } from './weather.js';
 
 // ---------------------------------------------------------------- formatting
@@ -22,19 +23,19 @@ export function faNum(v, decimals = null) {
   return s;
 }
 
-export const fmtTemp = (v) => (v === null || v === undefined ? '—' : `${faNum(Math.round(v))}°`);
-export const fmtKmh = (v) => (v === null || v === undefined ? '—' : `${faNum(Math.round(v))} km/h`);
-export const fmtCm = (v) => (v === null || v === undefined ? '—' : `${faNum(Math.round(v))} cm`);
+const fmtTemp = (v) => (v === null || v === undefined ? '—' : `${faNum(Math.round(v))}°`);
+const fmtKmh = (v) => (v === null || v === undefined ? '—' : `${faNum(Math.round(v))} km/h`);
+const fmtCm = (v) => (v === null || v === undefined ? '—' : `${faNum(Math.round(v))} cm`);
 // Visibility is a model estimate — don't imply false precision (41.9 → ۴۲).
-export const fmtKm = (v) => (v === null || v === undefined ? '—' : `${faNum(Math.round(v))} km`);
-export const fmtPct = (v) => (v === null || v === undefined ? '—' : `${faNum(Math.round(v))}٪`);
+const fmtKm = (v) => (v === null || v === undefined ? '—' : `${faNum(Math.round(v))} km`);
+const fmtPct = (v) => (v === null || v === undefined ? '—' : `${faNum(Math.round(v))}٪`);
 
-export function parseDay(dateStr) {
+function parseDay(dateStr) {
   if (typeof dateStr !== 'string' || dateStr.length < 10) return new Date();
   const [y, m, d] = dateStr.split('-').map(Number);
   return new Date(y, m - 1, d, 12, 0, 0);
 }
-export function fmtWeekday(dateStr) {
+function fmtWeekday(dateStr) {
   return new Intl.DateTimeFormat('fa-IR', { weekday: 'long', timeZone: APP.timezone }).format(parseDay(dateStr));
 }
 export function fmtDayMonth(dateStr) {
@@ -53,7 +54,8 @@ export function fmtTime(dateMs) {
 }
 
 // ---------------------------------------------------------------- primitives
-export function scoreClass(score) {
+/** CSS class for a score badge (gradient background). */
+function scoreClass(score) {
   if (!isNum(score)) return 'score-medium';
   if (score >= 80) return 'score-excellent';
   if (score >= 65) return 'score-good';
@@ -61,7 +63,9 @@ export function scoreClass(score) {
   if (score >= 35) return 'score-poor';
   return 'score-danger';
 }
-export function skiLabel(score) {
+
+/** Persian quality label for a ski score. */
+function skiLabel(score) {
   if (!isNum(score)) return 'نامشخص';
   if (score >= 80) return 'عالی';
   if (score >= 65) return 'خوب';
@@ -70,12 +74,17 @@ export function skiLabel(score) {
   return 'خیلی ضعیف';
 }
 
-export function verdictBadge(v, size = '') {
+function verdictBadge(v, size = '') {
   const meta = VERDICTS[v] || VERDICTS.caution;
   return `<span class="verdict-${meta.id} px-3 py-1 rounded-full font-black ${size}">${meta.icon} ${meta.label}</span>`;
 }
 
-export function barRow(label, value, cls = 'bar-ski') {
+/** Compact gradient badge for a score + its Persian label. */
+function scoreBadge(icon, score, text) {
+  return `<span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-black text-white ${scoreClass(score)}">${icon} ${faNum(score)}<span class="opacity-90 font-bold">${esc(text)}</span></span>`;
+}
+
+function barRow(label, value, cls = 'bar-ski') {
   const v = isNum(value) ? Math.max(0, Math.min(100, value)) : 0;
   const low = isNum(value) && value < 40 ? 'bar-low' : '';
   return `
@@ -107,7 +116,7 @@ const HERO_TABS = [
   { id: 'week', label: 'این هفته' },
 ];
 
-export function segTabs(items, active, action, ariaLabel = 'انتخاب حالت') {
+function segTabs(items, active, action, ariaLabel = 'انتخاب حالت') {
   return `<div class="seg" role="tablist" aria-label="${ariaLabel}">` +
     items.map((i) => `<button role="tab" aria-selected="${i.id === active}" class="${i.id === active ? 'active' : ''}" data-action="${action}" data-mode="${i.id}">${i.label}</button>`).join('') +
     `</div>`;
@@ -119,7 +128,7 @@ export function segTabs(items, active, action, ariaLabel = 'انتخاب حال�
  *  week:           { mode, weekRows, weekBest, allAvoid }
  */
 export function renderHero({ mode, ranked = [], dateLabel = '', stale = false, weekRows = [], weekBest = null, allAvoid = false } = {}) {
-  const title = mode === 'tomorrow' ? '🏔️ فردا کجا بریم؟' : mode === 'week' ? '️ این هفته کجا و چه روزی؟' : '🏔️ امروز کجا بریم؟';
+  const title = mode === 'tomorrow' ? '🏔️ فردا کجا بریم؟' : mode === 'week' ? '📅 این هفته کجا و چه روزی؟' : '🏔️ امروز کجا بریم؟';
   const head = `<div class="flex items-center justify-between gap-3 flex-wrap mb-4">
     <h2 class="section-title !mb-0">${title}</h2>
     ${segTabs(HERO_TABS, mode, 'hero-mode')}
@@ -287,7 +296,7 @@ export function renderDaySelector(days = [], selected = 0) {
 
 // ---------------------------------------------------------------- resort detail
 export function renderResortDetail(ctx = {}) {
-  const { resort, analysis, verdict, bestWindow, bestElev, why, confidence, trend, snowOpp, stale, updatedAt, lateDay } = ctx;
+  const { resort, analysis, verdict, bestWindow, bestElev, why, confidence, trend, snowOpp, stale, updatedAt, lateDay, sharedCell } = ctx;
   if (!analysis || analysis.failed) {
     return `<div class="glass-card rounded-3xl p-6 text-center">
       <div class="text-4xl mb-2">⚠️</div>
@@ -335,6 +344,7 @@ export function renderResortDetail(ctx = {}) {
       </div>
       ${stale ? `<div class="mt-2 text-xs font-bold">⚠️ آخرین داده ذخیره‌شده (${esc(fmtTime(updatedAt))}) — ${esc(ctx.staleNote || '')}</div>` : ''}
       ${lateDay ? `<div class="mt-2 text-sm font-bold bg-black/25 rounded-xl px-3 py-2">🌙 ساعات اسکی امروز تقریباً گذشته است — این تحلیل بر اساس کل روز است؛ برای برنامه‌ریزی، روزهای آینده را ببین.</div>` : ''}
+      ${sharedCell ? `<div class="mt-2 text-xs font-bold bg-black/25 rounded-xl px-3 py-2">📡 بخشی از ایستگاه‌های این پیست روی یک سلول شبکه‌ی مدل (~${MODEL.gridKm} کیلومتر) قرار می‌گیرند؛ در آن سلول فقط دما به‌ازای ارتفاع تفکیک می‌شود و بقیه‌ی متغیرها یکسان‌اند.</div>` : ''}
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -351,6 +361,7 @@ export function renderResortDetail(ctx = {}) {
         ${bestElev?.available
           ? `<div class="text-xl font-black accent-text">${esc(bestElev.nameFa)}</div>
              <ul class="why-list mt-2">${(bestElev.reasons || []).map((w) => `<li>• ${esc(w)}</li>`).join('')}</ul>
+             ${bestElev.sharedCell ? `<p class="meta-line mt-2">⚠️ ایستگاه‌های این پیست روی یک سلول شبکه‌ی مدل (~${MODEL.gridKm} کیلومتر) می‌افتند؛ تفاوتشان فقط از درون‌یابی دما می‌آید، نه از داده‌ی مستقل.</p>` : ''}
              <div class="flex gap-1 mt-2 flex-wrap">${(bestElev.ranking || []).map((r) => `<span class="pill text-xs">${esc(r.shortFa)}: <b class="tnum">${faNum(r.ski)}</b></span>`).join('')}</div>`
           : `<p class="text-sm opacity-70">نامشخص</p>`}
       </div>
@@ -415,13 +426,19 @@ function failedStationCard(a, i) {
 
 function stationCard(a, resort, locIdx, ctx) {
   const v = ctx.verdictsByLoc?.[locIdx] || { verdict: 'caution', icon: '🟡', label: 'نامشخص' };
-  const sc = scoreClass(a.ski.score);
   const riskCls = { low: 'risk-low', moderate: 'risk-moderate', elevated: 'risk-elevated', high: 'risk-high' }[a.risk.band] || 'risk-moderate';
   const flagPills = [];
   if (a.refreeze?.likely) flagPills.push(`<span class="pill pill-warn text-xs">🧊 ${esc(a.refreeze.label)}</span>`);
   if (a.rainOnSnow?.active) flagPills.push(`<span class="pill pill-bad text-xs">${esc(a.rainOnSnow.label)}</span>`);
+  if (a.rainOnSnow?.unknown) flagPills.push(`<span class="pill pill-warn text-xs">🌧️ ${esc(a.rainOnSnow.unknownReason)}</span>`);
   if (a.freezingRain?.likely) flagPills.push(`<span class="pill pill-bad text-xs">${esc(a.freezingRain.label)}</span>`);
   if (a.windLoading) flagPills.push(`<span class="pill pill-warn text-xs">🌬️ احتمال انباشت برف توسط باد (برآورد)</span>`);
+  // Height-correction provenance: the model's grid temperature was shifted to
+  // the station's official altitude. Shown so the number is traceable.
+  const hc = a.heightCorrection;
+  const hcNote = hc && hc.applied
+    ? `<div class="text-xs opacity-70 mt-1" dir="ltr">↕ temp adjusted ${hc.delta > 0 ? '+' : ''}${faNum(hc.delta, 1)}°C (DEM ${faNum(hc.demAlt)}m → station ${faNum(hc.targetAlt)}m)</div>`
+    : '';
 
   return `
   <article class="glass-card rounded-3xl overflow-hidden">
@@ -440,11 +457,12 @@ function stationCard(a, resort, locIdx, ctx) {
     <div class="px-5 py-3 flex justify-between items-center border-b" style="border-color: var(--border)">
       <div class="flex items-center gap-3">
         <div class="w-10 h-10 rounded-xl accent-bg flex items-center justify-center shadow-lg" style="color: var(--accent-contrast)">
-          <i data-lucide="mountain" class="w-5 h-5"></i>
+          <i data-lucide="mountain" class="w-5 h-5" aria-hidden="true"></i>
         </div>
         <div>
           <h3 class="font-black">${esc(a.nameFa)}</h3>
           <span class="text-xs opacity-60 tnum dir-ltr">${faNum(a.alt)}m</span>
+          ${hcNote}
         </div>
       </div>
       <button class="btn btn-ghost text-xs px-3" data-action="open-chart" data-loc="${locIdx}" aria-label="نمودار ساعتی ${esc(a.nameFa)}">📈 ساعتی</button>
@@ -466,7 +484,7 @@ function stationCard(a, resort, locIdx, ctx) {
       ${statCell('wind', fmtKmh(a.wind).replace(' km/h', ''), 'km/h باد')}
       ${statCell('eye', a.visKm === null ? '—' : faNum(a.visKm, 1), 'km دید')}
       ${statCell('snowflake', a.fresh24hCm === null ? '—' : faNum(a.fresh24hCm), 'cm تازه')}
-      ${statCell('cloud', a.cloud === null ? '—' : faNum(a.cloud), '٪ ابر')}
+      ${statCell('cloud', a.cloud === null ? '—' : fmtPct(a.cloud), 'ابر')}
     </div>
 
     <div class="p-4 flex flex-col gap-2 text-sm">
@@ -501,13 +519,13 @@ function stationCard(a, resort, locIdx, ctx) {
 
 function statCell(icon, value, unit) {
   return `<div class="p-3" style="background: var(--bg-soft)">
-    <i data-lucide="${icon}" class="w-4 h-4 mx-auto opacity-50 mb-1"></i>
+    <i data-lucide="${icon}" class="w-4 h-4 mx-auto opacity-50 mb-1" aria-hidden="true"></i>
     <div class="text-lg font-black tnum">${value}</div>
     <div class="text-xs opacity-60">${unit}</div>
   </div>`;
 }
 
-export function renderTimeline(rows = [], bestWindow = null) {
+function renderTimeline(rows = [], bestWindow = null) {
   if (!rows.length) return '<p class="text-sm opacity-60">داده ساعتی موجود نیست.</p>';
   const inWin = (h) => bestWindow?.available && h >= bestWindow.start && h < bestWindow.end;
   return `<div class="timeline" role="list" aria-label="تایم‌لاین ساعتی">` + rows
@@ -552,7 +570,7 @@ const ANALYSIS_TABS = [
 ];
 
 export function renderAnalysisPanel(ctx = {}) {
-  const { verdict, why, confidence, dataQuality, risk, updatedAt, stale, resortName, dateLabel, skiFactors, safetyFactors, mode = 'today' } = ctx;
+  const { verdict, why, confidence, dataQuality, risk, updatedAt, stale, resortName, dateLabel, skiFactors, safetyFactors, mode = 'today', sharedCell, minSafety, minSafetyZone } = ctx;
   const v = verdict || { verdict: 'caution', icon: '🟡', label: '' };
   const dqLabel = dataQuality?.level === 'good' ? '✅ خوب' : dataQuality?.level === 'limited' ? '⚠️ محدود' : '🔴 ضعیف';
   return `
@@ -565,6 +583,16 @@ export function renderAnalysisPanel(ctx = {}) {
       </div>
       ${segTabs(ANALYSIS_TABS, mode, 'analysis-mode')}
     </div>
+    ${(isNum(ctx.ski) || isNum(ctx.safety)) ? `
+    <div class="flex flex-wrap gap-2 mb-3">
+      ${isNum(ctx.ski) ? scoreBadge('🎿', ctx.ski, skiLabel(ctx.ski)) : ''}
+      ${isNum(ctx.safety) ? scoreBadge('🛡', ctx.safety, safetyLabel(ctx.safety)) : ''}
+    </div>` : ''}
+    ${(isNum(minSafety) && isNum(ctx.safety) && minSafety < ctx.safety) ? `
+    <div class="soft-card p-3 mb-3 text-sm">
+      <b>🛡 ایمنی ضعیف‌ترین ایستگاه:</b> <span class="tnum">${faNum(minSafety)}/۱۰۰</span>${minSafetyZone ? ` (${esc(minSafetyZone)})` : ''}
+      — میانگین پیست ${faNum(ctx.safety)} است، اما رأی نهایی با بدترین ایستگاه هم محدود می‌شود.
+    </div>` : ''}
     <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
       <div class="soft-card p-3">
         <h3 class="font-black text-sm mb-2">✅ نقاط قوت</h3>
@@ -592,7 +620,9 @@ export function renderAnalysisPanel(ctx = {}) {
       <span class="pill">🎯 پایه توصیه: <b>${esc(confidence?.label || 'نامشخص')}</b> <span class="opacity-70 tnum">(${faNum(confidence?.pct)}٪ کاملی داده)</span></span>
       <span class="pill">📡 کیفیت داده: <b>${dqLabel}</b></span>
       <span class="pill">⛰️ ریسک جوی: <b>${risk?.icon || ''} ${esc(risk?.label || '')}</b> (برآورد)</span>
+      <span class="pill">🛰️ شبکه‌ی مدل: <b>${esc(MODEL.name)}</b> <span class="opacity-70">(~${MODEL.gridKm} km)</span></span>
     </div>
+    ${sharedCell ? `<p class="meta-line mt-2">⚠️ برخی ایستگاه‌های این پیست روی یک سلول شبکه‌ی مدل می‌افتند؛ در آن سلول فقط دما به‌ازای ارتفاع تفکیک می‌شود و سایر متغیرها یکسان‌اند — پس «بهترین ارتفاع» در این پیست نشانه‌ی داده‌ی مستقل نیست.</p>` : ''}
     <p class="meta-line mt-2">«پایه توصیه» احتمال درست بودن پیش‌بینی نیست؛ فقط نشان می‌دهد داده‌های موجود چقدر کامل، تازه و هماهنگ بوده‌اند.</p>
     ${(confidence?.notes || []).length ? `<p class="meta-line mt-1">دلیل پایین‌تر بودن پایه: ${esc(confidence.notes.join(' • '))}</p>` : ''}
     <p class="meta-line mt-2">⏱ آخرین به‌روزرسانی داده: ${updatedAt ? esc(fmtTime(updatedAt)) : '—'} ${stale ? '⚠️ (ذخیره‌شده)' : ''} • افق پیش‌بینی: ${faNum(APP.forecastDays)} روز • منبع: ${esc(APP.dataSource)}</p>

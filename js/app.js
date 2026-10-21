@@ -2,23 +2,25 @@
  * SnowF — App shell: boot, state, data loading, events.
  * Pipeline: api → weather → analysis → recommendation → ui.
  *
- * Data strategy (stale-while-revalidate):
+ * Data strategy (stale-while-revalidate + progressive paint):
  *  - Opening the site NEVER blocks on the network: whatever is in the local
  *    cache is painted immediately (with its timestamp).
+ *  - Each station is rendered as soon as IT arrives — the page fills in
+ *    instead of waiting for the slowest of 12 requests.
  *  - If the cache is older than TTL, a background refresh runs silently and
  *    the UI re-renders when fresher data lands (toast + timestamp update).
  *  - Reopening within TTL makes ZERO API requests.
  */
 
-import { APP, CACHE_TTL_MS } from './config.js';
+import { APP, CACHE_TTL_MS, MODEL } from './config.js';
 import { loadResorts, resortIds } from './resorts.js';
-import { getForecast, getRoadForecast, wxCacheKey } from './api.js';
-import { storeGet, storeSet, cacheGet } from './cache.js';
-import { assessDataQuality, findNowIndex, isNum } from './weather.js';
+import { getForecast, getRoadForecast, wxCacheKey, apiErrorMessage } from './api.js';
+import { storeGet, storeSet, cacheGet, cacheClear } from './cache.js';
+import { assessDataQuality, findNowIndex, isNum, inSkiWindow, gridInfo } from './weather.js';
 import { analyzeLocationDay, analyzeResortDay, analyzeRoad } from './analysis.js';
 import {
   decide, findBestWindow, bestElevation, explainWhy,
-  confidenceFor, trendFromHourly, hourlySkiScore, VERDICTS,
+  confidenceFor, trendFromHourly, hourlySkiScore, VERDICTS, sharedGridCell,
 } from './recommendation.js';
 import { rankResorts, rankDays, snowOpportunity, findBestPick, compareTableRows } from './comparison.js';
 import { renderHourlyChart, ensureChart, destroyHourlyChart } from './charts.js';
@@ -35,11 +37,13 @@ const S = {
   favorites: [],
   compareOpen: false,
   snowOpen: false,
-  wx: {}, // resortId -> [station results {data, updatedAt, stale} | {error}]
+  wx: {}, // resortId -> [station results {data, updatedAt, stale, grid} | {error}]
   road: {}, // resortId -> road result
   memo: new Map(),
   lastFetchAt: 0,
   booted: false,
+  pending: 0, // in-flight station requests
+  stalePainted: false,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -81,8 +85,9 @@ async function boot() {
   const hasAnyCache = S.order.some((id) =>
     S.resorts[id].locations.some((loc) => cacheGet(wxCacheKey(loc.lat, loc.lon)).hit)
   );
-  if (!hasAnyCache) setLoading(true); // very first visit: nothing to show yet
-  await loadAll(false);
+  if (!hasAnyCache) setLoading(true);
+  // Each station is painted the moment it lands — never block on the slowest.
+  await loadAll(false, () => scheduleRender());
   if (!hasAnyCache) setLoading(false);
   S.lastFetchAt = Date.now();
   renderAll();
@@ -107,14 +112,31 @@ function fatal(msg) {
   $('global-error').innerHTML = `<div class="banner banner-bad justify-center">${UI.esc(msg)}</div>`;
 }
 
+// ---------------------------------------------------------------- rendering scheduler
+let renderQueued = false;
+function scheduleRender() {
+  if (renderQueued) return;
+  renderQueued = true;
+  const run = () => {
+    renderQueued = false;
+    if (!S.booted && !S.order.length) return;
+    renderAll();
+  };
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run);
+  else setTimeout(run, 0);
+}
+
 // ---------------------------------------------------------------- data loading (SWR)
 /**
  * Fill S.wx for every station.
  *  - fresh cache → used, no request
  *  - stale cache → used IMMEDIATELY (flagged), background refresh later
- *  - empty cache → real network fetch (only case that can take time)
+ *  - empty cache → real network fetch (painted progressively)
+ *
+ * @param {boolean} force bypass the cache
+ * @param {Function} onStation called whenever a station's data changes
  */
-async function loadAll(force) {
+async function loadAll(force, onStation) {
   S.memo.clear();
   S.stalePainted = false;
   let hadStale = false;
@@ -126,21 +148,37 @@ async function loadAll(force) {
       if (!force) {
         const c = cacheGet(wxCacheKey(loc.lat, loc.lon));
         if (c.hit) {
-          S.wx[id][i] = { data: c.data, updatedAt: c.updatedAt, stale: c.stale };
+          S.wx[id][i] = { data: c.data, updatedAt: c.updatedAt, stale: c.stale, grid: gridInfo(c.data) };
           if (c.stale) { S.stalePainted = true; hadStale = true; }
           return;
         }
       }
+      S.pending += 1;
       jobs.push(
         getForecast(loc.lat, loc.lon, { force })
-          .then((r) => { S.wx[id][i] = { data: r.data, updatedAt: r.updatedAt, stale: !!r.stale }; })
+          .then((r) => {
+            S.wx[id][i] = { data: r.data, updatedAt: r.updatedAt, stale: !!r.stale, grid: r.grid };
+            invalidateMemo(id);
+            onStation && onStation(id, i);
+          })
           .catch(() => { S.wx[id][i] = { error: true }; })
+          .finally(() => {
+            S.pending -= 1;
+            if (S.pending === 0) setLoading(false);
+          })
       );
     });
   }
   if (jobs.length) await Promise.all(jobs);
   if (jobs.length) S.lastFetchAt = Date.now();
   return hadStale;
+}
+
+/** Drop memoized analyses of one resort (its data just changed). */
+function invalidateMemo(resortId) {
+  for (const key of [...S.memo.keys()]) {
+    if (key.startsWith(`${resortId}|`)) S.memo.delete(key);
+  }
 }
 
 /** Silent refresh while data is older than TTL; re-renders when fresher lands. */
@@ -156,7 +194,7 @@ async function refreshInBackground() {
   refreshing = true;
   try {
     const before = Math.max(0, ...(S.order.flatMap((id) => (S.wx[id] || []).map((r) => (r && !r.error ? r.updatedAt : 0)))));
-    await loadAll(true);
+    await loadAll(true, () => scheduleRender());
     const after = Math.max(0, ...(S.order.flatMap((id) => (S.wx[id] || []).map((r) => (r && !r.error ? r.updatedAt : 0)))));
     if (after > before) {
       renderAll();
@@ -212,14 +250,23 @@ function analyze(resortId, day) {
     a._dq = dq;
     a._updatedAt = st ? st.updatedAt : 0;
     a._stale = st ? !!st.stale : false;
+    if (st && st.grid) a.grid = st.grid;
     return a;
   });
 
-  const resortA = analyzeResortDay(locs, { resortId, nameFa: resort.nameFa, dayIndex: day });
-  const bundle = { resort, locs, resort: resortA, day };
+  const resortA = analyzeResortDay(locs, { resortId, nameFa: resort.nameFa, fullNameFa: resort.fullNameFa, dayIndex: day });
+  const bundle = { resortMeta: resort, locs, resort: resortA, day };
 
   if (!resortA.failed) {
-    const verdict = decide({ ski: resortA.ski, safety: resortA.safety, depthCm: resortA.depthCm, hardStops: resortA.hardStops, riskBand: resortA.risk?.band });
+    const verdict = decide({
+      ski: resortA.ski,
+      safety: resortA.safety,
+      minSafety: resortA.minSafety,
+      minSafetyZone: resortA.minSafetyZone,
+      depthCm: resortA.depthCm,
+      hardStops: resortA.hardStops,
+      riskBand: resortA.risk?.band,
+    });
     bundle.verdict = verdict;
     bundle.verdictsByLoc = locs.map((a) =>
       a.failed ? null : decide({ ski: a.ski.score, safety: a.safety.score, depthCm: a.depthCm, hardStops: a.safety.hardStops, riskBand: a.risk.band })
@@ -234,7 +281,7 @@ function analyze(resortId, day) {
 
     bundle.timeline = winLoc
       ? winLoc._hours
-          .filter((r) => isNum(r.hour) && r.hour >= 7 && r.hour <= 16)
+          .filter((r) => inSkiWindow(r.hour))
           .map((r) => ({ hour: r.hour, temp: isNum(r.temp) ? Math.round(r.temp) : null, wind: isNum(r.wind) ? Math.round(r.wind) : null, snowfall: r.snowfall, rain: r.rain, cloud: r.cloud, score: hourlySkiScore(r, depthForHours).score }))
       : [];
 
@@ -259,7 +306,10 @@ function analyze(resortId, day) {
     const stale = locs.some((a) => a._stale);
     const lateDay = locs.some((a) => !a.failed && a.lateDay);
     const contradiction = rep && isNum(rep.probMax) && rep.probMax >= 70 && (rep.fresh24hCm || 0) === 0 && (rep.precipMm || 0) === 0;
-    bundle.confidence = confidenceFor({ dayIndex: day, missingVars, stale, contradiction, lateDay });
+    // Stations that share a model grid cell are not independent readings.
+    const sharedCell = sharedGridCell(locs);
+    bundle.sharedCell = sharedCell;
+    bundle.confidence = confidenceFor({ dayIndex: day, missingVars, stale, contradiction, lateDay, sharedCell });
     bundle.dataQuality = worstDQ(locs.map((a) => a._dq));
     bundle.updatedAt = Math.max(...locs.map((a) => a._updatedAt || 0));
     bundle.stale = stale;
@@ -307,8 +357,8 @@ function weekCandidates() {
       const rep = b.locs.find((a) => !a.failed && a.zone === 'summit') || b.locs.find((a) => !a.failed);
       cands.push({
         resortId: id, nameFa: b.resort.nameFa, dayIndex: d, date: b.resort.date,
-        ski: b.resort.ski, safety: b.resort.safety, snowScore: b.resort.snowScore,
-        fresh: b.resort.fresh24hCm, wind: b.resort.wind, gust: b.resort.gust, visKm: b.resort.visKm,
+        ski: b.resort.ski, safety: b.resort.safety, minSafety: b.resort.minSafety, minSafetyZone: b.resort.minSafetyZone,
+        snowScore: b.resort.snowScore, fresh: b.resort.fresh24hCm, wind: b.resort.wind, gust: b.resort.gust, visKm: b.resort.visKm,
         depthCm: b.resort.depthCm, risk: b.resort.risk, hardStops: b.resort.hardStops,
         windowLabel: b.bestWindow.available ? b.bestWindow.label : null,
         prob: rep?.probMax ?? null,
@@ -361,7 +411,7 @@ function renderStaleBanner() {
     el.innerHTML = `<div class="banner banner-warn">⚠️ ${offline ? 'آفلاین — ' : ''}داده‌های ذخیره‌شده نمایش داده می‌شوند (آخرین دریافت: ${t})${offline ? '' : ' — به‌روزرسانی در پس‌زمینه…'}. پیش‌بینی تازه فقط با اینترنت ممکن است.</div>`;
   } else if (anyError) {
     el.classList.remove('hidden');
-    el.innerHTML = `<div class="banner banner-warn">⚠️ دریافت داده بعضی ایستگاه‌ها ناموفق بود — بخش‌های دارای داده نمایش داده می‌شوند. <button class="underline font-black" data-action="retry">تلاش مجدد</button></div>`;
+    el.innerHTML = `<div class="banner banner-warn">⚠️ ${UI.esc(apiErrorMessage())} بخش‌های دارای داده نمایش داده می‌شوند. <button class="underline font-black" data-action="retry">تلاش مجدد</button></div>`;
   } else {
     el.classList.add('hidden');
     el.innerHTML = '';
@@ -472,6 +522,7 @@ function renderDetail() {
     updatedAt: b.updatedAt,
     staleNote: 'به‌روزرسانی نشده',
     lateDay: b.lateDay,
+    sharedCell: b.sharedCell,
     dateLabel: `${UI.dayLabel(S.day, dateStr)}${dateStr ? ` • ${UI.fmtFull(dateStr)}` : ''}`,
   });
 }
@@ -500,6 +551,8 @@ function renderForecast() {
       dayIndex: d,
       ski: b.resort.ski,
       safety: b.resort.safety,
+      minSafety: b.resort.minSafety,
+      minSafetyZone: b.resort.minSafetyZone,
       depthCm: b.resort.depthCm,
       risk: b.resort.risk,
       hardStops: b.resort.hardStops,
@@ -541,6 +594,8 @@ function renderAnalysis() {
         dayIndex: d,
         ski: b.resort.ski,
         safety: b.resort.safety,
+        minSafety: b.resort.minSafety,
+        minSafetyZone: b.resort.minSafetyZone,
         depthCm: b.resort.depthCm,
         risk: b.resort.risk,
         hardStops: b.resort.hardStops,
@@ -573,8 +628,13 @@ function renderAnalysis() {
     risk: b.resort.risk,
     updatedAt: b.updatedAt,
     stale: b.stale,
+    sharedCell: b.sharedCell,
     resortName: b.resort.nameFa,
     dateLabel: `${UI.dayLabel(day, dateStr)}${dateStr ? `، ${UI.fmtDayMonth(dateStr)}` : ''}`,
+    ski: b.resort.ski,
+    safety: b.resort.safety,
+    minSafety: b.resort.minSafety,
+    minSafetyZone: b.resort.minSafetyZone,
     skiFactors: b.skiFactors,
     safetyFactors: b.safetyFactors,
     mode: S.analysisMode,
@@ -642,7 +702,9 @@ function renderRoadPanel() {
 }
 
 function renderFooterMeta() {
-  $('footer-meta').textContent = `افق: ${APP.forecastDays} روز • منبع: ${APP.dataSource} • کش محلی: ${Math.round(CACHE_TTL_MS / 60000)} دقیقه`;
+  $('footer-meta').textContent = `افق: ${APP.forecastDays} روز • منبع: ${APP.dataSource} (${MODEL.name}) • کش محلی: ${Math.round(CACHE_TTL_MS / 60000)} دقیقه`;
+  const v = $('app-version');
+  if (v) v.textContent = `SnowF v${APP.version}`;
 }
 
 // ---------------------------------------------------------------- actions
@@ -751,10 +813,12 @@ function toggleFav(id) {
   UI.toast(i >= 0 ? 'از علاقه‌مندی‌ها حذف شد' : '⭐ به علاقه‌مندی‌ها اضافه شد');
 }
 
+/** Retry: drop the cached payloads entirely (they may be corrupt) and refetch. */
 async function retryLoad() {
   setLoading(true);
   $('global-error').classList.add('hidden');
-  await loadAll(true);
+  cacheClear();
+  await loadAll(true, () => scheduleRender());
   setLoading(false);
   renderAll();
   loadRoad(S.resort);
@@ -784,6 +848,9 @@ async function openChart(locIdx) {
   }
   $('hourly-modal').classList.remove('hidden');
   $('hourly-modal').classList.add('flex');
+  // Move focus into the dialog so keyboard users are not left behind.
+  const close = $('btn-close-modal');
+  if (close) close.focus();
 }
 
 function closeModal() {
@@ -871,6 +938,6 @@ function registerSW() {
 }
 
 // Debug handle (factors etc. inspectable from console).
-window.SnowF = { state: S, analyze, VERDICTS, version: '3.1.0' };
+window.SnowF = { state: S, analyze, VERDICTS, version: APP.version };
 
 document.addEventListener('DOMContentLoaded', boot);

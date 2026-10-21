@@ -71,7 +71,7 @@ export function calculateMountainRisk(ctx = {}) {
 
   // Rain on snow.
   const rain = isNum(ctx.rainMm) ? ctx.rainMm : 0;
-  if (rain >= RISK.rainOnSnow.rainMin && isNum(ctx.depthCm) && ctx.depthCm >= 15) {
+  if (rain >= RISK.rainOnSnow.rainMin && isNum(ctx.depthCm) && ctx.depthCm >= RISK.rainOnSnow.depthMin) {
     push(`باران روی برف (${rain} م‌م)`, RISK.rainOnSnow.points);
   }
 

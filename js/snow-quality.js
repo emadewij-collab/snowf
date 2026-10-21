@@ -12,7 +12,7 @@
 import { SNOW, FLAGS } from './config.js';
 import { isNum } from './weather.js';
 
-export const SURFACE_LABELS = {
+const SURFACE_LABELS = {
   powder: 'پودر ❄',
   fresh: 'تازه ❄',
   packed: 'کوبیده و مناسب',
@@ -146,8 +146,8 @@ export function detectRainOnSnow({ rainMm = 0, snowDepthCm = 0 } = {}) {
   if (rain >= f.rainMm && depth >= f.depthCm) {
     return {
       active: true,
-      severe: rain >= 2,
-      label: rain >= 2 ? '🌧️ باران قابل توجه روی برف' : '🌧️ باران خفیف روی برف (برآورد)',
+      severe: rain >= f.severeRainMm,
+      label: rain >= f.severeRainMm ? '🌧️ باران قابل توجه روی برف' : '🌧️ باران خفیف روی برف (برآورد)',
     };
   }
   return { active: false, severe: false, label: null };

@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { analyzeLocationDay, analyzeResortDay, analyzeRoad } from '../js/analysis.js';
+import { analyzeLocationDay, analyzeResortDay, analyzeRoad, detectDeterioration } from '../js/analysis.js';
 import { assessDataQuality, buildDayHours, tempRise24h } from '../js/weather.js';
 import { decide } from '../js/recommendation.js';
 import { makePayload, dropVar } from './helpers.mjs';
@@ -31,12 +31,16 @@ describe('weather normalizer', () => {
 
 describe('analyzeLocationDay (end-to-end scenarios)', () => {
   it('scenario 10: perfect day → high ski + safety', () => {
+    // Fixture must be internally consistent: the hourly snowfall (6 h × 1.5 cm)
+    // is what "fresh snow in the trailing 24 h" is derived from, and it must
+    // add up to the declared daily sum.
     const p = makePayload({
-      hourly: { snowfall: (d, h) => (d === 0 && h < 6 ? 0.5 : 0) },
-      daily: { snowfall_sum: (d) => (d === 0 ? 12 : 0) },
+      hourly: { snowfall: (d, h) => (d === 0 && h < 6 ? 1.5 : 0) },
+      daily: { snowfall_sum: (d) => (d === 0 ? 9 : 0) },
     });
     const a = analyzeLocationDay(p, 0, META);
     assert.equal(a.failed, false);
+    assert.equal(a.fresh24hCm, 9);
     assert.ok(a.ski.score >= 75, `ski=${a.ski.score}`);
     assert.ok(a.safety.score >= 85, `safety=${a.safety.score}`);
     assert.equal(a.snow.category, 'powder');
@@ -128,6 +132,39 @@ describe('analyzeLocationDay (end-to-end scenarios)', () => {
   });
 });
 
+describe('detectDeterioration', () => {
+  const hour = (h, score) => ({ hour: h, temp: -5, appTemp: -7, wind: 10, gust: 15, visKm: 12, cloud: 20, snowfall: 0, rain: 0, isDay: 1 });
+  it('is false when nothing changes', () => {
+    const hours = [];
+    for (let h = 0; h < 24; h++) hours.push(hour(h));
+    assert.equal(detectDeterioration(hours, 9), false);
+  });
+  it('is false without a "now" context (future days)', () => {
+    const hours = [];
+    for (let h = 0; h < 24; h++) hours.push(hour(h));
+    assert.equal(detectDeterioration(hours, null), false);
+  });
+  it('detects a bad evening after a good ski window', () => {
+    const hours = [];
+    for (let h = 0; h < 24; h++) {
+      hours.push(h < 16 ? hour(h) : { ...hour(h), wind: 60, gust: 95, visKm: 0.4 });
+    }
+    assert.equal(detectDeterioration(hours, 9), true);
+  });
+  it('feeds the safety engine as a penalty', () => {
+    const p = makePayload({
+      hourly: {
+        wind_speed_10m: (d, h) => (h >= 16 ? 60 : 10),
+        wind_gusts_10m: (d, h) => (h >= 16 ? 95 : 15),
+        visibility: (d, h) => (h >= 16 ? 400 : 12000),
+      },
+    });
+    const a = analyzeLocationDay(p, 0, META, { fromHour: 9 });
+    assert.equal(a.deteriorating, true);
+    assert.ok(a.safety.factors.some((f) => f.key === 'deterioration'));
+  });
+});
+
 describe('analyzeResortDay', () => {
   it('combines 3 stations; partial failure tolerated', () => {
     const p = makePayload();
@@ -140,6 +177,36 @@ describe('analyzeResortDay', () => {
     assert.equal(r.failed, false);
     assert.equal(r.partial, true);
     assert.ok(Number.isFinite(r.ski) && Number.isFinite(r.safety));
+  });
+
+  it('depth for the viability gate comes from the BEST station, not only the summit', () => {
+    // Summit is wind-scoured (0 cm) but the mid station still has 60 cm.
+    const bare = makePayload({ hourly: { snow_depth: () => 0 } });
+    const deep = makePayload({ hourly: { snow_depth: () => 0.6 } });
+    const locs = [
+      analyzeLocationDay(bare, 0, { ...META, zone: 'summit' }),
+      analyzeLocationDay(deep, 0, { ...META, zone: 'mid' }),
+    ];
+    const r = analyzeResortDay(locs, { resortId: 'dizin', nameFa: 'دیزین', dayIndex: 0 });
+    assert.equal(r.depthCm, 60, 'the deepest station decides the snow gate');
+  });
+
+  it('exposes the worst station safety as an independent floor', () => {
+    const calm = makePayload();
+    const stormy = makePayload({ hourly: { wind_gusts_10m: () => 120 } });
+    const locs = [
+      analyzeLocationDay(calm, 0, { ...META, zone: 'summit' }),
+      analyzeLocationDay(stormy, 0, { ...META, zone: 'mid' }),
+    ];
+    const r = analyzeResortDay(locs, { resortId: 'dizin', nameFa: 'دیزین', dayIndex: 0 });
+    assert.ok(r.minSafety <= r.safety, 'minSafety is never above the average');
+    assert.ok(r.minSafetyZone);
+  });
+
+  it('carries the resort full name for the UI header', () => {
+    const p = makePayload();
+    const r = analyzeResortDay([analyzeLocationDay(p, 0, META)], { resortId: 'dizin', nameFa: 'دیزین', fullNameFa: 'پیست دیزین', dayIndex: 0 });
+    assert.equal(r.fullNameFa, 'پیست دیزین');
   });
 });
 

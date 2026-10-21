@@ -18,7 +18,6 @@ body {
 .dir-ltr { direction: ltr; display: inline-block; unicode-bidi: isolate; }
 .hide-scroll::-webkit-scrollbar { display: none; }
 .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
-.muted { color: var(--text-muted); }
 .accent-bg { background-color: var(--accent); }
 .accent-text { color: var(--accent); }
 
@@ -42,7 +41,6 @@ button { font-family: inherit; cursor: pointer; }
 .btn:active { transform: scale(0.97); }
 .btn-primary { background: var(--accent); color: var(--accent-contrast); box-shadow: var(--card-shadow); }
 .btn-ghost { background: var(--bg-soft); color: var(--text-primary); border: 1px solid var(--border); }
-.btn-danger { background: var(--bad); color: #fff; }
 
 /* Section titles */
 .section-title {

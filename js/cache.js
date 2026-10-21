@@ -8,6 +8,9 @@
  * Never serves stale data silently: entries past TTL are marked stale and the
  * UI must show "آخرین داده ذخیره‌شده" + timestamp.
  *
+ * Both tiers obey the SAME age policy, so an entry can never be served fresh
+ * from memory while the persisted copy of the same age is already discarded.
+ *
  * Import-safe in Node (guards around localStorage).
  */
 
@@ -52,11 +55,16 @@ export function cacheGet(key) {
       return { hit: true, data: persisted.data, updatedAt: persisted.updatedAt, stale: false };
     }
     if (age < STALE_OK_MS) {
+      mem.set(key, persisted);
       return { hit: true, data: persisted.data, updatedAt: persisted.updatedAt, stale: true };
     }
   }
-  // Expired memory entry: still usable as last-resort stale (flagged).
-  if (m) return { hit: true, data: m.data, updatedAt: m.updatedAt, stale: true };
+  // Older than the stale window in both tiers → treat as absent.
+  if (m) {
+    const age = now - m.updatedAt;
+    if (age < STALE_OK_MS) return { hit: true, data: m.data, updatedAt: m.updatedAt, stale: true };
+    mem.delete(key);
+  }
   return { hit: false, data: null, updatedAt: 0, stale: false };
 }
 
@@ -66,13 +74,19 @@ export function cacheSet(key, data, updatedAt = Date.now()) {
   lsSet(key, entry);
 }
 
+/** Drop every cached forecast (memory + localStorage). */
 export function cacheClear() {
   mem.clear();
   try {
     if (typeof localStorage === 'undefined') return;
-    Object.keys(localStorage)
-      .filter((k) => k.startsWith(LS_PREFIX))
-      .forEach((k) => localStorage.removeItem(k));
+    // Enumerate with the standard storage API (length + key(i)) — more
+    // reliable than Object.keys() across browsers and polyfills.
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k) keys.push(k);
+    }
+    keys.filter((k) => k.startsWith(LS_PREFIX)).forEach((k) => localStorage.removeItem(k));
   } catch { /* ignore */ }
 }
 

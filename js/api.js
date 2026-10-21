@@ -6,10 +6,14 @@
  *  - In-flight deduplication: identical concurrent calls share one request.
  *  - Failures never throw uncaught to the UI: callers use allSettled-style
  *    handling and per-station failure is isolated.
+ *  - The response's grid metadata (latitude / longitude / elevation of the
+ *    cell the request snapped to) is returned so the app can detect stations
+ *    that share a model cell — see weather.js/gridCellKey.
  */
 
-import { APP } from './config.js';
+import { APP, MODEL } from './config.js';
 import { cacheGet, cacheSet } from './cache.js';
+import { gridInfo } from './weather.js';
 
 const BASE = 'https://api.open-meteo.com/v1/forecast';
 
@@ -141,23 +145,33 @@ async function fetchJson(url, timeoutMs = 20000, retry = 1) {
   throw lastErr;
 }
 
+function buildUrl(lat, lon, hourly, daily, days) {
+  const params = new URLSearchParams({
+    latitude: String(lat),
+    longitude: String(lon),
+    hourly: hourly.join(','),
+    timezone: APP.timezone,
+    forecast_days: String(days),
+  });
+  if (daily && daily.length) params.set('daily', daily.join(','));
+  if (MODEL.name) params.set('models', MODEL.name);
+  return `${BASE}?${params.toString()}`;
+}
+
 /**
  * Fetch (or reuse cached) full forecast for one point.
- * @returns {Promise<{ data, updatedAt, stale, fromCache }>} — rejects only
+ * @returns {Promise<{ data, updatedAt, stale, fromCache, grid }>} — rejects only
  *   when there is NO usable data at all (no network + no cache).
  */
 export function getForecast(lat, lon, { force = false } = {}) {
   const k = key(lat, lon, 'wx');
   if (!force) {
     const c = cacheGet(k);
-    if (c.hit && !c.stale) return Promise.resolve({ data: c.data, updatedAt: c.updatedAt, stale: false, fromCache: true });
+    if (c.hit && !c.stale) return Promise.resolve({ data: c.data, updatedAt: c.updatedAt, stale: false, fromCache: true, grid: gridInfo(c.data) });
   }
   if (inflight.has(k)) return inflight.get(k);
 
-  const url =
-    `${BASE}?latitude=${lat}&longitude=${lon}` +
-    `&hourly=${HOURLY_VARS.join(',')}&daily=${DAILY_VARS.join(',')}` +
-    `&forecast_days=${APP.forecastDays}&timezone=${encodeURIComponent(APP.timezone)}`;
+  const url = buildUrl(lat, lon, HOURLY_VARS, DAILY_VARS, APP.forecastDays);
 
   const p = (async () => {
     try {
@@ -165,10 +179,10 @@ export function getForecast(lat, lon, { force = false } = {}) {
       if (!data || !data.hourly || !data.daily) throw new Error('bad-payload');
       const updatedAt = Date.now();
       cacheSet(k, data, updatedAt);
-      return { data, updatedAt, stale: false, fromCache: false };
+      return { data, updatedAt, stale: false, fromCache: false, grid: gridInfo(data) };
     } catch (err) {
       const c = cacheGet(k);
-      if (c.hit) return { data: c.data, updatedAt: c.updatedAt, stale: true, fromCache: true };
+      if (c.hit) return { data: c.data, updatedAt: c.updatedAt, stale: true, fromCache: true, grid: gridInfo(c.data) };
       throw err;
     } finally {
       inflight.delete(k);
@@ -187,9 +201,7 @@ export function getRoadForecast(lat, lon, { force = false } = {}) {
   }
   if (inflight.has(k)) return inflight.get(k);
 
-  const url =
-    `${BASE}?latitude=${lat}&longitude=${lon}` +
-    `&hourly=${ROAD_HOURLY_VARS.join(',')}&forecast_days=2&timezone=${encodeURIComponent(APP.timezone)}`;
+  const url = buildUrl(lat, lon, ROAD_HOURLY_VARS, null, 2);
 
   const p = (async () => {
     try {
@@ -210,10 +222,16 @@ export function getRoadForecast(lat, lon, { force = false } = {}) {
   return p;
 }
 
-/** Friendly Persian message for fetch failures. */
-export function apiErrorMessage() {
+/**
+ * Friendly Persian message for fetch failures.
+ * @param {Error|null} err
+ */
+export function apiErrorMessage(err = null) {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) {
     return 'به اینترنت متصل نیستی — آخرین داده ذخیره‌شده نمایش داده می‌شود.';
+  }
+  if (err && /HTTP 429/.test(String(err.message || err))) {
+    return 'درخواست‌های زیادی به سرویس هواشناسی ارسال شد — چند لحظه بعد دوباره تلاش کن.';
   }
   return 'دریافت اطلاعات هواشناسی ناموفق بود.';
 }

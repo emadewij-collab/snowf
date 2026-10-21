@@ -10,14 +10,16 @@
  * Pure module: no DOM, no network. Safe to unit-test in Node.
  */
 
-import { ELEVATION_WEIGHTS, FLAGS, LIFT_ESTIMATE, LENS, SKI_HOURS } from './config.js';
+import { ELEVATION_WEIGHTS, FLAGS, LIFT_ESTIMATE, LENS, SKI_HOURS, VERDICT } from './config.js';
 import {
   get, isNum, buildDayHours, buildDaySummary, summarizeSkiWindow,
-  tempRise24h, freshSnowTrailing, windDirName, hhmm, r0, r1,
+  tempRise24h, freshSnow24h, findNowIndex, gridInfo, heightCorrection,
+  windDirName, hhmm, r0, r1,
 } from './weather.js';
 import { estimateSnowSurface, detectRefreeze, detectRainOnSnow, detectFreezingRain } from './snow-quality.js';
 import { calculateMountainRisk, calculateSafetyScore } from './safety.js';
 import { calculateSkiQuality } from './ski-score.js';
+import { hourlySkiScore } from './recommendation.js';
 
 /**
  * Full analysis for one station (location) and one day.
@@ -40,7 +42,9 @@ export function analyzeLocationDay(data, dayIndex, meta = {}, opts = {}) {
     return { ...base, failed: true, failReason: 'داده هواشناسی موجود نیست' };
   }
 
-  const hours = buildDayHours(data, dayIndex);
+  // --- Height correction: model temperature → true station altitude. ---
+  const hc = heightCorrection(data, meta.alt ?? null);
+  const hours = buildDayHours(data, dayIndex, { targetAlt: meta.alt ?? null });
   const day = buildDaySummary(data, dayIndex);
   if (!hours.length) {
     return { ...base, failed: true, failReason: 'داده ساعتی برای این روز موجود نیست' };
@@ -55,7 +59,14 @@ export function analyzeLocationDay(data, dayIndex, meta = {}, opts = {}) {
 
   // --- Derived context ---
   const warming = tempRise24h(data, dayIndex);
-  const fresh24h = isNum(day.snowSum) ? Math.round(day.snowSum * 10) / 10 : isNum(win.totalSnowCm) ? r1(win.totalSnowCm) : 0;
+  // TRUE trailing 24h (may cross midnight) — not the calendar-day sum.
+  const nowIndex = findNowIndex(data.hourly.time);
+  const fresh24h = (() => {
+    const trailing = freshSnow24h(data, dayIndex, nowIndex);
+    if (isNum(trailing)) return trailing;
+    if (isNum(day.snowSum)) return Math.round(day.snowSum * 10) / 10;
+    return 0;
+  })();
   const depthCm = isNum(win.snowDepthCm) ? Math.round(win.snowDepthCm) : isNum(day.snowSum) && day.snowSum > 0 ? null : 0;
   const depthKnown = isNum(win.snowDepthCm);
 
@@ -65,6 +76,12 @@ export function analyzeLocationDay(data, dayIndex, meta = {}, opts = {}) {
 
   const rainMm = r1(isNum(win.totalRainMm) ? win.totalRainMm : isNum(day.rainSum) ? day.rainSum : 0);
   const rainOnSnow = detectRainOnSnow({ rainMm, snowDepthCm: depthKnown ? depthCm : 0 });
+  // Depth unknown + rain falling → we can neither confirm nor rule out
+  // rain-on-snow. Say so instead of silently assuming "no snowpack".
+  if (!depthKnown && rainMm >= FLAGS.rainOnSnow.rainMm) {
+    rainOnSnow.unknown = true;
+    rainOnSnow.unknownReason = 'عمق برف نامشخص — وضعیت باران روی برف قابل ارزیابی نیست';
+  }
   const freezingRain = detectFreezingRain({
     precipMm: win.totalPrecipMm,
     tempC: win.avgTemp,
@@ -102,6 +119,9 @@ export function analyzeLocationDay(data, dayIndex, meta = {}, opts = {}) {
     visKm: win.minVisKm,
   });
 
+  // --- Deterioration over the next hours (only meaningful for "today") ---
+  const deteriorating = detectDeterioration(hours, opts.fromHour ?? null);
+
   // --- Safety (independent dimension) ---
   const safety = calculateSafetyScore(
     {
@@ -115,7 +135,7 @@ export function analyzeLocationDay(data, dayIndex, meta = {}, opts = {}) {
       feelsMinC: win.minFeels,
       capeMax: win.maxCape,
       liMin: win.minLi,
-      deteriorating: false, // filled by recommendation/trend layer when "now" context exists
+      deteriorating,
     },
     risk
   );
@@ -158,7 +178,7 @@ export function analyzeLocationDay(data, dayIndex, meta = {}, opts = {}) {
     windDir: windDirName(day.windDir) || windDirName(win.hours[Math.floor(win.hours.length / 2)]?.windDir),
     visKm: isNum(win.minVisKm) ? r1(win.minVisKm) : null,
     cloud: r0(win.avgCloud),
-    humidity: null, // max humidity available in flags layer if needed
+    humidity: r0(win.maxHumidity),
     precipMm: r1(win.totalPrecipMm),
     probMax: r0(day.probMax),
     rainMm,
@@ -185,6 +205,10 @@ export function analyzeLocationDay(data, dayIndex, meta = {}, opts = {}) {
     freezingReading,
     warming24h: warming,
     tempTrend,
+    deteriorating,
+    // provenance (for honest disclosure in the UI)
+    grid: gridInfo(data),
+    heightCorrection: hc,
     // extras
     lens,
     lift,
@@ -202,6 +226,7 @@ export function analyzeResortDay(locationAnalyses = [], meta = {}) {
   const res = {
     resortId: meta.resortId || '',
     nameFa: meta.nameFa || '',
+    fullNameFa: meta.fullNameFa || '',
     dayIndex: meta.dayIndex ?? 0,
     date: ok[0]?.date || '',
     locations: locationAnalyses,
@@ -227,10 +252,25 @@ export function analyzeResortDay(locationAnalyses = [], meta = {}) {
   res.gust = rep.gust;
   res.visKm = rep.visKm;
   res.fresh24hCm = Math.max(...ok.map((a) => a.fresh24hCm || 0));
-  res.depthCm = rep.depthCm;
+  // Depth for the viability gate: the BEST available station, not only the
+  // summit. A wind-scoured summit must not condemn a resort whose mid
+  // station still has 60 cm of snow.
+  res.depthCm = VERDICT.depthFrom === 'summit' ? rep.depthCm : bestDepth(ok);
+  res.depthKnown = ok.some((a) => a.depthKnown);
+  // Worst station safety — an independent floor for the verdict, so one
+  // dangerous station can never be averaged away by two calm ones.
+  res.minSafety = Math.min(...ok.map((a) => a.safety.score));
+  res.minSafetyZone = ok.slice().sort((a, b) => a.safety.score - b.safety.score)[0]?.shortFa || null;
   res.hardStops = [...new Set(ok.flatMap((a) => a.safety.hardStops.map((h) => h.label)))];
   res.flags = [...new Set(ok.flatMap((a) => a.safety.flags.map((f) => f.label)))];
   return res;
+}
+
+/** Best (deepest) known snow depth across stations — null when unknown. */
+function bestDepth(analyses = []) {
+  const known = analyses.filter((a) => a && !a.failed && isNum(a.depthCm));
+  if (!known.length) return null;
+  return Math.max(...known.map((a) => a.depthCm));
 }
 
 // ---------------------------------------------------------------------------
@@ -257,6 +297,28 @@ function windowTempTrend(rows) {
   if (b - a >= 2) return 'warming';
   if (a - b >= 2) return 'cooling';
   return 'stable';
+}
+
+/**
+ * Deterioration detection for "today": compares the remaining ski window
+ * with the hours that follow it. Uses the same hourly score the timeline
+ * shows, so the number the user sees matches the reason we give.
+ *
+ * @param {Array} hours full day rows
+ * @param {number|null} fromHour current hour (null → not applicable)
+ * @returns {boolean}
+ */
+export function detectDeterioration(hours = [], fromHour = null) {
+  if (fromHour === null || !Array.isArray(hours) || !hours.length) return false;
+  const scored = hours
+    .filter((r) => isNum(r.hour))
+    .map((r) => ({ hour: r.hour, s: hourlySkiScore(r, null).score }));
+  const now = scored.filter((r) => r.hour >= fromHour && r.hour <= SKI_HOURS.end);
+  const later = scored.filter((r) => r.hour > SKI_HOURS.end);
+  if (now.length < 2 || later.length < 2) return false;
+  const avg = (a) => a.reduce((s, r) => s + r.s, 0) / a.length;
+  const drop = avg(now) - avg(later);
+  return drop >= FLAGS.deterioration.skiDrop;
 }
 
 function freezingLevelReading(freezingLevelM, stationAltM) {

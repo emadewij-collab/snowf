@@ -21,3 +21,6 @@ jobs:
       - name: JSON validation
         run: |
           node -e "JSON.parse(require('fs').readFileSync('data/resorts.json','utf8')); JSON.parse(require('fs').readFileSync('manifest.json','utf8')); console.log('JSON OK')"
+      # Release consistency (version match, fallback data, precache list,
+      # pinned CDN deps) is asserted by tests/consistency.test.mjs, which
+      # runs as part of "node --test" above.

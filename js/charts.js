@@ -32,7 +32,7 @@ export function ensureChart() {
   return chartPromise;
 }
 
-export function hasCharts() {
+function hasCharts() {
   return typeof window !== 'undefined' && typeof window.Chart !== 'undefined';
 }
 
