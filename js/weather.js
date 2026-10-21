@@ -14,6 +14,7 @@
 import { HEIGHT, SKI_HOURS } from './config.js';
 
 // Hourly variables we rely on (used for the data-quality report).
+// Must stay in sync with HOURLY_VARS in api.js.
 const KEY_HOURLY_VARS = [
   'temperature_2m',
   'apparent_temperature',
@@ -21,7 +22,6 @@ const KEY_HOURLY_VARS = [
   'rain',
   'snowfall',
   'snow_depth',
-  'weather_code',
   'visibility',
   'cloud_cover',
   'wind_speed_10m',
@@ -191,13 +191,11 @@ export function buildDayHours(data, dayIndex, opts = {}) {
       temp: shifted(get(h.temperature_2m, i), shift),
       appTemp: shifted(get(h.apparent_temperature, i), shift),
       humidity: get(h.relative_humidity_2m, i),
-      dewPoint: shifted(get(h.dew_point_2m, i), shift),
       precip: get(h.precipitation, i),
       prob: get(h.precipitation_probability, i),
       rain: get(h.rain, i),
       snowfall: get(h.snowfall, i), // cm
       snowDepth: get(h.snow_depth, i), // m in API! converted below
-      weatherCode: get(h.weather_code, i),
       cloud: get(h.cloud_cover, i),
       vis: get(h.visibility, i), // meters
       wind: get(h.wind_speed_10m, i),

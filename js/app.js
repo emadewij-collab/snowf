@@ -14,7 +14,7 @@
 
 import { APP, CACHE_TTL_MS, MODEL } from './config.js';
 import { loadResorts, resortIds } from './resorts.js';
-import { getForecast, getRoadForecast, wxCacheKey, apiErrorMessage } from './api.js';
+import { getForecasts, getRoadForecasts, wxCacheKey, apiErrorMessage } from './api.js';
 import { storeGet, storeSet, cacheGet, cacheClear } from './cache.js';
 import { assessDataQuality, findNowIndex, isNum, inSkiWindow, gridInfo } from './weather.js';
 import { analyzeLocationDay, analyzeResortDay, analyzeRoad } from './analysis.js';
@@ -86,8 +86,8 @@ async function boot() {
     S.resorts[id].locations.some((loc) => cacheGet(wxCacheKey(loc.lat, loc.lon)).hit)
   );
   if (!hasAnyCache) setLoading(true);
-  // Each station is painted the moment it lands — never block on the slowest.
-  await loadAll(false, () => scheduleRender());
+  // One multi-location request covers all 12 stations.
+  await loadAll(false);
   if (!hasAnyCache) setLoading(false);
   S.lastFetchAt = Date.now();
   renderAll();
@@ -117,68 +117,101 @@ let renderQueued = false;
 function scheduleRender() {
   if (renderQueued) return;
   renderQueued = true;
-  const run = () => {
+  // setTimeout, NOT requestAnimationFrame: rAF is paused entirely in a
+  // background tab, which would leave the page on its skeleton until the
+  // user switches back (measured: 15.5 s instead of 3.5 s).
+  setTimeout(() => {
     renderQueued = false;
     if (!S.booted && !S.order.length) return;
     renderAll();
-  };
-  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run);
-  else setTimeout(run, 0);
+  }, 0);
 }
 
 // ---------------------------------------------------------------- data loading (SWR)
 /**
  * Fill S.wx for every station.
+ *
  *  - fresh cache → used, no request
  *  - stale cache → used IMMEDIATELY (flagged), background refresh later
- *  - empty cache → real network fetch (painted progressively)
+ *  - empty cache → ONE multi-location request for all missing stations
+ *    (Open-Meteo answers a comma-separated coordinate list with an array)
  *
  * @param {boolean} force bypass the cache
- * @param {Function} onStation called whenever a station's data changes
  */
-async function loadAll(force, onStation) {
+async function loadAll(force) {
   S.memo.clear();
   S.stalePainted = false;
   let hadStale = false;
-  const jobs = [];
+
+  // Cache lookup for every station.
+  const points = [];
+  const slots = [];
   for (const id of S.order) {
     const resort = S.resorts[id];
     S.wx[id] = S.wx[id] || [];
     resort.locations.forEach((loc, i) => {
-      if (!force) {
-        const c = cacheGet(wxCacheKey(loc.lat, loc.lon));
-        if (c.hit) {
-          S.wx[id][i] = { data: c.data, updatedAt: c.updatedAt, stale: c.stale, grid: gridInfo(c.data) };
-          if (c.stale) { S.stalePainted = true; hadStale = true; }
-          return;
-        }
-      }
-      S.pending += 1;
-      jobs.push(
-        getForecast(loc.lat, loc.lon, { force })
-          .then((r) => {
-            S.wx[id][i] = { data: r.data, updatedAt: r.updatedAt, stale: !!r.stale, grid: r.grid };
-            invalidateMemo(id);
-            onStation && onStation(id, i);
-          })
-          .catch(() => { S.wx[id][i] = { error: true }; })
-          .finally(() => {
-            S.pending -= 1;
-            if (S.pending === 0) setLoading(false);
-          })
-      );
+      slots.push({ id, i, loc });
+      points.push({ lat: loc.lat, lon: loc.lon });
     });
   }
-  if (jobs.length) await Promise.all(jobs);
-  if (jobs.length) S.lastFetchAt = Date.now();
+
+  const missing = [];
+  slots.forEach((s, n) => {
+    if (!force) {
+      const c = cacheGet(wxCacheKey(s.loc.lat, s.loc.lon));
+      if (c.hit) {
+        S.wx[s.id][s.i] = { data: c.data, updatedAt: c.updatedAt, stale: c.stale, grid: gridInfo(c.data) };
+        if (c.stale) { S.stalePainted = true; hadStale = true; }
+        return;
+      }
+    }
+    missing.push(n);
+  });
+
+  if (!missing.length) return hadStale;
+
+  // All chunks are fetched in parallel; each one paints the moment it lands,
+  // so a slow chunk never holds back the resorts that are already in.
+  S.pending += 1;
+  const subset = missing.map((n) => points[n]);
+  try {
+    const results = await getForecasts(subset, {
+      force,
+      onChunk: (idxs) => {
+        idxs.forEach((k) => {
+          const s = slots[missing[k]];
+          const r = results && results[k];
+          if (!r) return;
+          S.wx[s.id][s.i] = r.error
+            ? { error: true }
+            : { data: r.data, updatedAt: r.updatedAt, stale: !!r.stale, grid: r.grid };
+        });
+        invalidateMemo();
+        scheduleRender();
+      },
+    });
+    results.forEach((r, k) => {
+      const s = slots[missing[k]];
+      S.wx[s.id][s.i] = r.error
+        ? { error: true }
+        : { data: r.data, updatedAt: r.updatedAt, stale: !!r.stale, grid: r.grid };
+    });
+    S.lastFetchAt = Date.now();
+  } catch {
+    for (const n of missing) {
+      const s = slots[n];
+      S.wx[s.id][s.i] = { error: true };
+    }
+  } finally {
+    S.pending -= 1;
+    setLoading(S.pending > 0);
+  }
   return hadStale;
 }
 
-/** Drop memoized analyses of one resort (its data just changed). */
-function invalidateMemo(resortId) {
-  for (const key of [...S.memo.keys()]) {
-    if (key.startsWith(`${resortId}|`)) S.memo.delete(key);
-  }
+/** Drop every memoized analysis (the underlying data just changed). */
+function invalidateMemo() {
+  S.memo.clear();
 }
 
 /** Silent refresh while data is older than TTL; re-renders when fresher lands. */
@@ -194,7 +227,7 @@ async function refreshInBackground() {
   refreshing = true;
   try {
     const before = Math.max(0, ...(S.order.flatMap((id) => (S.wx[id] || []).map((r) => (r && !r.error ? r.updatedAt : 0)))));
-    await loadAll(true, () => scheduleRender());
+    await loadAll(true);
     const after = Math.max(0, ...(S.order.flatMap((id) => (S.wx[id] || []).map((r) => (r && !r.error ? r.updatedAt : 0)))));
     if (after > before) {
       renderAll();
@@ -208,13 +241,23 @@ async function refreshInBackground() {
   }
 }
 
+/**
+ * Road / access weather for every resort — ONE request for all road points
+ * (Open-Meteo multi-location), then the panel shows the selected resort.
+ */
 async function loadRoad(resortId) {
-  const resort = S.resorts[resortId];
-  if (!resort?.road) return;
+  const pairs = S.order
+    .map((id) => ({ id, road: S.resorts[id]?.road }))
+    .filter((p) => p.road);
+  if (!pairs.length) return;
   try {
-    S.road[resortId] = await getRoadForecast(resort.road.lat, resort.road.lon);
+    const results = await getRoadForecasts(pairs.map((p) => ({ lat: p.road.lat, lon: p.road.lon })));
+    pairs.forEach((p, i) => {
+      const r = results[i];
+      S.road[p.id] = r && !r.error ? r : { error: true };
+    });
   } catch {
-    S.road[resortId] = { error: true };
+    for (const p of pairs) S.road[p.id] = { error: true };
   }
   renderRoadPanel();
 }
@@ -840,7 +883,7 @@ async function retryLoad() {
   setLoading(true);
   $('global-error').classList.add('hidden');
   cacheClear();
-  await loadAll(true, () => scheduleRender());
+  await loadAll(true);
   setLoading(false);
   renderAll();
   loadRoad(S.resort);

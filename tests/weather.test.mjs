@@ -1,5 +1,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join, resolve } from 'path';
 import {
   heightCorrection, inSkiWindow, trailing24hSum, freshSnow24h, dayEndIndex,
   buildDayHours, summarizeSkiWindow, gridInfo, gridCellKey, haversineKm,
@@ -7,6 +10,8 @@ import {
 } from '../js/weather.js';
 import { HEIGHT, SKI_HOURS } from '../js/config.js';
 import { makePayload } from './helpers.mjs';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 describe('height correction', () => {
   it('shifts the model temperature to the true station altitude', () => {
@@ -45,12 +50,25 @@ describe('height correction', () => {
     const d = Math.round(-500 * HEIGHT.lapseRate * 100) / 100;
     assert.equal(shifted[0].temp - plain[0].temp, d);
     assert.equal(shifted[0].appTemp - plain[0].appTemp, d);
-    assert.equal(shifted[0].dewPoint - plain[0].dewPoint, d);
     // wind / precip / cloud must NOT move
     assert.equal(shifted[0].wind, plain[0].wind);
     assert.equal(shifted[0].precip, plain[0].precip);
     assert.equal(shifted[0].cloud, plain[0].cloud);
     assert.equal(shifted[0].snowDepth, plain[0].snowDepth);
+  });
+
+  it('only requests the variables the app actually reads', () => {
+    const api = readFileSync(join(ROOT, 'js/api.js'), 'utf8');
+    const list = api.match(/const HOURLY_VARS = \[([\s\S]*?)\];/)[1];
+    const vars = [...list.matchAll(/'([^']+)'/g)].map((m) => m[1]);
+    // none of these is read by any engine or by the UI
+    for (const dead of ['showers', 'weather_code', 'pressure_msl', 'cloud_cover_low', 'cloud_cover_mid', 'cloud_cover_high', 'convective_inhibition', 'dew_point_2m']) {
+      assert.ok(!vars.includes(dead), `${dead} is never read — it must not be requested`);
+    }
+    // and the ones we do rely on must still be there
+    for (const need of ['temperature_2m', 'apparent_temperature', 'relative_humidity_2m', 'precipitation', 'rain', 'snowfall', 'snow_depth', 'cloud_cover', 'visibility', 'wind_speed_10m', 'wind_gusts_10m', 'cape', 'lifted_index', 'freezing_level_height']) {
+      assert.ok(vars.includes(need), `${need} is required`);
+    }
   });
 });
 

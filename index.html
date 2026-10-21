@@ -19,10 +19,31 @@
   <link rel="preconnect" href="https://unpkg.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 
-  <!-- Tailwind CSS (browser build) -->
+  <!--
+    Modulepreload: the app is 13 ES modules in a 3-level deep import graph.
+    Without this the browser discovers them in 3 sequential round trips
+    (app.js -> its imports -> config/weather), which delays the first
+    weather request by ~700 ms. Preloading fetches all of them in parallel.
+  -->
+  <link rel="modulepreload" href="./js/app.js">
+  <link rel="modulepreload" href="./js/config.js">
+  <link rel="modulepreload" href="./js/weather.js">
+  <link rel="modulepreload" href="./js/cache.js">
+  <link rel="modulepreload" href="./js/api.js">
+  <link rel="modulepreload" href="./js/resorts.js">
+  <link rel="modulepreload" href="./js/analysis.js">
+  <link rel="modulepreload" href="./js/safety.js">
+  <link rel="modulepreload" href="./js/ski-score.js">
+  <link rel="modulepreload" href="./js/snow-quality.js">
+  <link rel="modulepreload" href="./js/recommendation.js">
+  <link rel="modulepreload" href="./js/comparison.js">
+  <link rel="modulepreload" href="./js/charts.js">
+  <link rel="modulepreload" href="./js/ui.js">
+
+  <!-- Tailwind CSS (browser build) — kept render-blocking to avoid a flash of unstyled content -->
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-  <!-- Lucide Icons — pinned version (no @latest: reproducible + supply-chain safe) -->
-  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <!-- Lucide Icons — pinned version, deferred (it only runs after the DOM exists) -->
+  <script defer src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
   <!-- Chart.js به‌تأخیر و فقط هنگام باز شدن نمودار ساعتی بارگذاری می‌شود (js/charts.js) -->
 
   <link rel="stylesheet" href="./css/themes.css">

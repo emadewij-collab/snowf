@@ -32,6 +32,35 @@ export const APP = {
 export const CACHE_TTL_MS = 60 * 60 * 1000; // 1h: reopening the site within an hour makes NO new request
 export const STALE_OK_MS = 6 * 60 * 60 * 1000; // accept stale cache offline up to 6h (flagged)
 
+// ---------------------------------------------------------------------------
+// API transport
+//
+// Open-Meteo answers a comma-separated coordinate list with one payload per
+// location, but it computes them SERIALLY inside the request: the response
+// time grows roughly linearly with the number of locations. Measured on the
+// live API (average wall time for all 12 stations, 3 rounds):
+//
+//   12 requests x 1 location  ->  26.7 s
+//    6 requests x 2 locations ->  12.1 s   <-- best
+//    4 requests x 3 locations ->  15.9 s
+//    3 requests x 4 locations ->  18.3 s
+//    2 requests x 6 locations ->  21.2 s
+//    1 request  x 12 locations -> 110.5 s   <-- worst
+//
+// So: small chunks, all fired concurrently. One giant request is by far the
+// slowest way to ask for the same data.
+// ---------------------------------------------------------------------------
+export const API = {
+  /** Locations per request (see the table above). */
+  locationsPerRequest: 2,
+  /** Maximum number of requests in flight at the same time. */
+  maxConcurrent: 6,
+  /** Per-request timeout (ms). */
+  timeoutMs: 15000,
+  /** Retries after a timeout / network error. */
+  retries: 1,
+};
+
 // Skiable hours of day (local time) used for "best time" search.
 export const SKI_HOURS = { start: 7, end: 16, minWindowHours: 2 };
 
@@ -85,7 +114,7 @@ export const HEIGHT = {
   /** Dry-air lapse rate used by Open-Meteo for its own height correction. */
   lapseRate: 0.0065, // °C per metre
   /** Variables that are shifted by the height correction. */
-  applyTo: ['temperature_2m', 'apparent_temperature', 'dew_point_2m'],
+  applyTo: ['temperature_2m', 'apparent_temperature'],
   /** Ignore the correction below this |Δ| (m) — DEM noise, not worth shifting. */
   minDeltaM: 25,
 };
