@@ -6,7 +6,7 @@ import { dirname, join, resolve } from 'path';
 import {
   heightCorrection, inSkiWindow, trailing24hSum, freshSnow24h, dayEndIndex,
   buildDayHours, summarizeSkiWindow, gridInfo, gridCellKey, haversineKm,
-  buildDayIndex, findNowIndex,
+  buildDayIndex, findNowIndex, dayHourRows, coldSnowfall,
 } from '../js/weather.js';
 import { HEIGHT, SKI_HOURS } from '../js/config.js';
 import { makePayload } from './helpers.mjs';
@@ -167,5 +167,62 @@ describe('day/hour alignment', () => {
     const i = findNowIndex(p.hourly.time, new Date('2026-01-10T05:30:00Z'));
     assert.ok(i === null || Number.isInteger(i));
     assert.equal(findNowIndex(null), null);
+  });
+});
+
+describe('coldSnowfall', () => {
+  it('counts only the snowfall that falls at or below freezing', () => {
+    // 1.9 cm total, but most of it falls while it is above freezing (sleet).
+    const hours = [
+      { hour: 6, temp: -0.1, snowfall: 0.14 },
+      { hour: 7, temp: 0, snowfall: 0.14 },
+      { hour: 8, temp: 0.2, snowfall: 0.42 }, // above freezing -> sleet
+      { hour: 9, temp: 1.3, snowfall: 0.42 }, // above freezing -> sleet
+      { hour: 10, temp: 1, snowfall: 0.77 }, // above freezing -> sleet
+    ];
+    assert.equal(coldSnowfall(hours), 0.3);
+  });
+
+  it('sums a full below-freezing snowfall', () => {
+    const hours = [
+      { hour: 17, temp: -0.2, snowfall: 0.1 },
+      { hour: 18, temp: -0.7, snowfall: 0.4 },
+      { hour: 19, temp: -1.2, snowfall: 0.6 },
+      { hour: 20, temp: -1.9, snowfall: 0.9 },
+    ];
+    assert.equal(coldSnowfall(hours), 2);
+  });
+
+  it('returns 0 for a dry day, for rain, and for empty input', () => {
+    assert.equal(coldSnowfall([]), 0);
+    assert.equal(coldSnowfall([{ hour: 10, temp: -3, snowfall: 0 }]), 0);
+    assert.equal(coldSnowfall([{ hour: 10, temp: 4, snowfall: 1.2 }]), 0);
+    assert.equal(coldSnowfall(), 0);
+  });
+
+  it('ignores rows with missing temperature or snowfall values', () => {
+    const hours = [
+      { hour: 5, temp: null, snowfall: 0.5 },
+      { hour: 6, temp: -2, snowfall: null },
+      { hour: 7, temp: -2, snowfall: 0.2 },
+    ];
+    assert.equal(coldSnowfall(hours), 0.2);
+  });
+});
+
+describe('dayHourRows', () => {
+  it('returns the 24 rows of the requested calendar day', () => {
+    const p = makePayload({ days: 2, startDate: '2026-01-10' });
+    const rows = dayHourRows(p, 0);
+    assert.equal(rows.length, 24);
+    assert.equal(rows[0].hour, 0);
+    assert.equal(rows[23].hour, 23);
+    assert.ok(rows.every((r) => typeof r.temp === 'number'));
+  });
+
+  it('returns an empty list when the day is out of range', () => {
+    const p = makePayload({ days: 1, startDate: '2026-01-10' });
+    assert.deepEqual(dayHourRows(p, 9), []);
+    assert.deepEqual(dayHourRows({}, 0), []);
   });
 });

@@ -16,7 +16,7 @@ import { APP, CACHE_TTL_MS, MODEL } from './config.js';
 import { loadResorts, resortIds } from './resorts.js';
 import { getForecasts, getRoadForecasts, wxCacheKey, apiErrorMessage } from './api.js';
 import { storeGet, storeSet, cacheGet, cacheClear } from './cache.js';
-import { assessDataQuality, findNowIndex, isNum, inSkiWindow, gridInfo } from './weather.js';
+import { assessDataQuality, findNowIndex, isNum, inSkiWindow, gridInfo, dayHourRows, coldSnowfall } from './weather.js';
 import { analyzeLocationDay, analyzeResortDay, analyzeRoad } from './analysis.js';
 import {
   decide, findBestWindow, bestElevation, explainWhy,
@@ -393,7 +393,7 @@ function worstDQ(dqs) {
 
 function buildOpportunity(resortId, day) {
   const st = stationData(resortId, 0);
-  if (!st) return { score: 0, label: 'نامشخص', factors: [], capped: false };
+  if (!st) return { score: 0, label: 'نامشخص', factors: [], capped: false, freshCm: 0, probPct: 0, hasSignal: false };
   const d = st.data.daily || {};
   const g = (arr, i) => (Array.isArray(arr) && typeof arr[i] === 'number' ? arr[i] : null);
   const fresh = g(d.snowfall_sum, day) ?? 0;
@@ -401,8 +401,15 @@ function buildOpportunity(resortId, day) {
   const tmax = g(d.temperature_2m_max, day);
   const gust = g(d.wind_gusts_10m_max, day) ?? 0;
   const nextMax = g(d.temperature_2m_max, day + 1);
+
+  // Snow that actually falls AS snow: the model reports a daily snowfall
+  // sum that can include sleet, so we only count the hours that are below
+  // freezing. A day with 2 cm of "snow" at +1 °C is rain, not a snow day.
+  const coldSnow = coldSnowfall(dayHourRows(st.data, day));
+
   return snowOpportunity({
     freshCm: fresh,
+    coldSnowCm: coldSnow,
     probPct: prob,
     tempMaxC: tmax,
     gustKmh: gust,
@@ -729,23 +736,34 @@ function renderSnowPanel() {
   for (let d = 0; d < APP.forecastDays; d++) {
     const b = analyze(S.resort, d);
     if (b.resort.failed) continue;
+    const opp = b.snowOpp || {};
     days.push({
       dayIndex: d,
       label: UI.dayLabel(d, b.resort.date),
       dateShort: b.resort.date ? UI.fmtDayMonth(b.resort.date) : '',
+      verdict: b.verdict.verdict,
       ski: b.resort.ski,
       safety: b.resort.safety,
-      fresh: Math.round(b.resort.fresh24hCm || 0),
+      fresh: Math.round((opp.coldSnowCm ?? 0) * 10) / 10,
+      prob: Math.round(opp.probPct ?? 0),
+      hasSignal: !!opp.hasSignal,
       depthCm: b.resort.depthCm,
       risk: b.resort.risk,
       hardStops: b.resort.hardStops,
-      opp: b.snowOpp?.score ?? 0,
+      opp: opp.score ?? 0,
     });
   }
   const icon = { go: '🟢', caution: '🟡', avoid: '🔴' };
-  const top = rankDays(days, 3)
-    .map((d) => ({ ...d, verdictIcon: icon[d.verdict.verdict] || '', medal: d.medal }))
-    .filter((d) => d.opp >= 25 || d.fresh >= 3);
+  // Only days with a real snow signal may be advertised as "snow days".
+  const candidates = days.filter((d) => d.hasSignal);
+  const medals = ['🥇', '🥈', '🥉'];
+  const top = candidates
+    .filter((d) => d.fresh >= 0.5 || d.opp >= 24)
+    // This panel answers "when will it snow?", so the biggest snowfall
+    // comes first; the opportunity score breaks ties.
+    .sort((a, b) => b.fresh - a.fresh || b.opp - a.opp || a.dayIndex - b.dayIndex)
+    .slice(0, 3)
+    .map((d, i) => ({ ...d, verdictIcon: icon[d.verdict] || '', medal: medals[i] }));
   el.innerHTML = UI.renderSnowPanel({ resortName: S.resorts[S.resort].nameFa, days: top });
   el.classList.remove('hidden');
   el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });

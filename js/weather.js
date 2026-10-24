@@ -385,6 +385,44 @@ export function freshSnow24h(data, dayIndex, nowIndex = null) {
 }
 
 /**
+ * Hour rows of one calendar day, reduced to what the snow-opportunity
+ * model needs: the hour, the temperature and the snowfall.
+ */
+export function dayHourRows(data, dayIndex) {
+  try {
+    if (!data?.hourly?.time || !data?.daily?.time) return [];
+    const range = buildDayIndex(data.hourly.time).get(data.daily.time[dayIndex]);
+    if (!range) return [];
+    const out = [];
+    for (let i = range.start; i <= range.end; i++) {
+      out.push({
+        hour: Number((data.hourly.time[i] || '').slice(11, 13)),
+        temp: data.hourly.temperature_2m?.[i],
+        snowfall: data.hourly.snowfall?.[i] || 0,
+      });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Snowfall that actually falls AS snow.
+ *
+ * The daily `snowfall_sum` counts every frozen precipitation, including
+ * sleet, so a "2 cm snow" day at +1 °C is really rain. Only the hours at
+ * or below freezing are real snow.
+ */
+export function coldSnowfall(hours = []) {
+  let total = 0;
+  for (const h of hours) {
+    if (isNum(h.snowfall) && h.snowfall > 0 && isNum(h.temp) && h.temp <= 0) total += h.snowfall;
+  }
+  return Math.round(total * 10) / 10;
+}
+
+/**
  * Current hour index within hourly[].time for "now" in the forecast timezone.
  * Falls back to null when it cannot be determined.
  */

@@ -390,27 +390,49 @@ export const VERDICT = {
 // SNOW OPPORTUNITY (0-100) — "is it worth waiting/going for snow?"
 // ---------------------------------------------------------------------------
 export const OPPORTUNITY = {
+  // The bands are driven by the amount of snow that actually falls AS snow
+  // (below-freezing hours), not by the raw daily sum — the daily sum can be
+  // sleet. A real 2 cm of snow therefore always outranks a merely cold
+  // and calm day.
   freshFcstCm: [
-    { min: 15, points: 38 },
-    { min: 8, points: 30 },
-    { min: 4, points: 20 },
-    { min: 1, points: 10 },
+    { min: 15, points: 42 },
+    { min: 8, points: 36 },
+    { min: 4, points: 30 },
+    { min: 1, points: 20 },
     { min: -Infinity, points: 0 },
   ],
   probability: [
-    { min: 70, points: 14 },
-    { min: 40, points: 7 },
+    { min: 70, points: 6 },
+    { min: 40, points: 3 },
     { min: -Infinity, points: 0 },
   ],
-  tempOk: { max: 0, points: 8 },
+  tempOk: { max: 0, points: 4 },
   windOk: [
-    { max: 30, points: 10 },
-    { max: 40, points: 4 },
-    { max: Infinity, points: -10 },
+    // Calm wind HELPS snow settle, but a strong wind only removes the
+    // bonus — the "wind-affected" case (heavy snow + gale) is handled by
+    // the cap below, so a single windy day is not punished twice.
+    { max: 30, points: 6 },
+    { max: 40, points: 2 },
+    { max: Infinity, points: 0 },
   ],
-  persistence: { points: 8 }, // next-day max stays cold → snow lasts
+  persistence: { points: 3 }, // next-day max stays cold → snow lasts
   windAffectedCap: 55, // heavy snow + strong wind → capped (wind-affected)
   windAffected: { freshMin: 8, gustMin: 55 },
+
+  // Score bands.
+  bands: { great: 60, good: 40, fair: 24 },
+
+  // A cold, calm day is only a PRECONDITION for snow — it is not evidence
+  // that snow will fall. Without a real snow signal (an amount in the
+  // forecast, or a meaningful probability WHILE IT IS COLD ENOUGH FOR
+  // SNOW) the index must stay near zero, otherwise the app would
+  // advertise "snow days" for dry, cold days — or for rainy, mild days.
+  signal: {
+    minCm: 1, // snow amount (cm) that counts as a signal
+    minProb: 40, // precipitation probability (%) that counts as a signal
+    capWithoutSignal: 12, // hard cap when there is no snow signal at all
+    maxTempForSnow: 0, // above this (°C) precipitation is rain, not snow
+  },
 };
 
 // ---------------------------------------------------------------------------

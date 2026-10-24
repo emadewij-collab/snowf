@@ -77,27 +77,43 @@ export function rankDays(days = [], topN = 3) {
 
 /**
  * Snow Opportunity index (0-100): should a snow-watcher get excited?
+ *
+ * A day only qualifies when there is an actual snow SIGNAL — snow in the
+ * forecast, or a meaningful probability of it. Cold + calm on its own is
+ * merely a precondition; without a signal the index is capped low so the
+ * app never advertises "snow is coming" for a dry day.
+ *
  * Heavy snow + strong wind is CAPPED (wind-affected, not dreamy).
+ *
+ * @returns {{ score, label, factors, capped, freshCm, probPct, hasSignal }}
  */
 export function snowOpportunity(ctx = {}) {
   const factors = [];
   let score = 0;
   const fresh = isNum(ctx.freshCm) ? ctx.freshCm : 0;
+  // Snow that falls below freezing — the honest amount. Falls back to the
+  // raw daily sum when the hourly detail is unavailable.
+  const coldSnow = isNum(ctx.coldSnowCm) ? ctx.coldSnowCm : fresh;
   const prob = isNum(ctx.probPct) ? ctx.probPct : 0;
   const tempMax = isNum(ctx.tempMaxC) ? ctx.tempMaxC : null;
   const gust = isNum(ctx.gustKmh) ? ctx.gustKmh : 0;
 
+  // Precipitation only counts as a SNOW signal while it is cold enough to
+  // fall as snow — otherwise it is just rain.
+  const coldEnough = tempMax !== null && tempMax <= OPPORTUNITY.signal.maxTempForSnow;
+  const hasSignal = coldSnow >= OPPORTUNITY.signal.minCm || (prob >= OPPORTUNITY.signal.minProb && coldEnough);
+
   for (const b of OPPORTUNITY.freshFcstCm) {
-    if (fresh >= b.min) {
+    if (coldSnow >= b.min) {
       score += b.points;
-      if (b.points > 0) factors.push({ label: `پیش‌بینی ${Math.round(fresh)} سانتی‌متر برف`, points: b.points });
+      if (b.points > 0) factors.push({ label: `پیش‌بینی ${Math.round(coldSnow * 10) / 10} سانتی‌متر برف`, points: b.points });
       break;
     }
   }
   for (const b of OPPORTUNITY.probability) {
-    if (prob >= b.min) {
+    if (prob >= b.min && coldEnough) {
       score += b.points;
-      if (b.points > 0) factors.push({ label: `احتمال بارش ${Math.round(prob)}٪`, points: b.points });
+      if (b.points > 0) factors.push({ label: `احتمال بارش برفی ${Math.round(prob)}٪`, points: b.points });
       break;
     }
   }
@@ -119,15 +135,34 @@ export function snowOpportunity(ctx = {}) {
 
   let capped = false;
   const wa = OPPORTUNITY.windAffected;
-  if (fresh >= wa.freshMin && gust >= wa.gustMin && score > OPPORTUNITY.windAffectedCap) {
-    score = OPPORTUNITY.windAffectedCap;
+  if (coldSnow >= wa.freshMin && gust >= wa.gustMin) {
+    if (score > OPPORTUNITY.windAffectedCap) score = OPPORTUNITY.windAffectedCap;
     capped = true;
     factors.push({ label: 'سقف: برف سنگین همراه باد شدید (بادخورده)', points: 0 });
   }
 
+  // No snow is coming -> the opportunity is essentially zero, no matter how
+  // cold and calm it is.
+  if (!hasSignal) {
+    if (score > OPPORTUNITY.signal.capWithoutSignal) {
+      score = OPPORTUNITY.signal.capWithoutSignal;
+      capped = true;
+    }
+    factors.push({
+      label: coldEnough ? 'برفی پیش‌بینی نمی‌شود — فقط هوا سرد است' : 'بیشتر از حد گرم است و بارش به شکل باران خواهد بود',
+      points: 0,
+    });
+  }
+
   score = Math.max(0, Math.min(100, Math.round(score)));
-  const label = score >= 70 ? 'عالی — ارزش برنامه‌ریزی دارد' : score >= 50 ? 'خوب' : score >= 30 ? 'متوسط' : 'کم';
-  return { score, label, factors, capped };
+  const B = OPPORTUNITY.bands;
+  const label = !hasSignal
+    ? 'برفی پیش‌بینی نمی‌شود'
+    : score >= B.great ? 'عالی — ارزش برنامه‌ریزی دارد'
+    : score >= B.good ? 'خوب'
+    : score >= B.fair ? 'متوسط'
+    : 'کم';
+  return { score, label, factors, capped, freshCm: fresh, coldSnowCm: coldSnow, probPct: prob, hasSignal };
 }
 
 /**

@@ -802,19 +802,25 @@ export function renderCompare(rows = [], { dateLabel = '' } = {}) {
 export function renderSnowPanel({ resortName = '', days = [] } = {}) {
   if (!days.length) {
     return `<div class="glass-card p-5 rounded-2xl text-center">
-      <p class="font-black">تا ۱۶ روز آینده، فرصت برفی قابل توجهی دیده نمی‌شود</p>
-      <p class="text-sm opacity-60 mt-1">برنامه‌ی خوبی برای استراحت یا نگهداری تجهیزات است ❄️</p>
+      <p class="font-black">تا ۱۶ روز آینده، برف قابل توجهی پیش‌بینی نمی‌شود</p>
+      <p class="text-sm opacity-60 mt-1">هوا سرد می‌ماند ولی بارش برفی در پیش نیست — برنامه‌ی خوبی برای استراحت یا نگهداری تجهیزات است ❄️</p>
     </div>`;
   }
-  return `
+  // If every listed day has measurable snow we can say "snow days";
+  // otherwise they are only days with a chance of snow.
+  const allMeasured = days.every((d) => d.fresh > 0);
+  const title = allMeasured ? '🎉 بهترین روزهای برفی' : '❄️ روزهای با احتمال برف';
+  const subtitle = allMeasured
+    ? 'مرتب‌شده بر اساس مقدار برفِ پیش‌بینی‌شده (فقط ساعت‌های زیر صفر) + شرایط باد و دما'
+    : 'بارش قطعی نیست — فقط احتمال آن بالاست. مرتب‌شده بر اساس احتمال بارش برفی';  return `
   <div class="glass-card p-5 rounded-2xl relative overflow-hidden" style="background: linear-gradient(135deg, #0ea5e9, #6366f1); color: #fff;">
     <div class="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
       <div class="snow-particle"></div><div class="snow-particle"></div><div class="snow-particle"></div>
       <div class="snow-particle"></div><div class="snow-particle"></div><div class="snow-particle"></div>
     </div>
     <div class="text-center mb-4 relative z-10">
-      <p class="text-white/80 text-sm mb-1">🎉 بهترین روزهای برفی ${esc(resortName)}</p>
-      <p class="text-xs text-white/70">رتبه‌بندی بر اساس کیفیت + ایمنی + فرصت برف (نه فقط مجموع بارش)</p>
+      <p class="text-white/80 text-sm mb-1">${title} ${esc(resortName)}</p>
+      <p class="text-xs text-white/70">${esc(subtitle)}</p>
     </div>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-3 relative z-10">
       ${days.map((d) => `
@@ -822,8 +828,14 @@ export function renderSnowPanel({ resortName = '', days = [] } = {}) {
           <div class="font-black">${d.medal} ${esc(d.label)}</div>
           <div class="text-xs opacity-80 mb-2">${esc(d.dateShort)}</div>
           <div class="bg-white rounded-lg py-2 mb-2">
-            <span class="text-2xl font-black text-sky-600 tnum">${faNum(d.fresh)}</span>
-            <span class="text-xs text-gray-600 block">سانتی‌متر تازه</span>
+            ${d.fresh >= 1
+              ? `<span class="text-2xl font-black text-sky-600 tnum">${faNum(d.fresh)}</span>
+                 <span class="text-xs text-gray-600 block">سانتی‌متر برف</span>`
+              : d.fresh > 0
+              ? `<span class="text-2xl font-black text-sky-600 tnum">زیر ۱</span>
+                 <span class="text-xs text-gray-600 block">سانتی‌متر برف</span>`
+              : `<span class="text-2xl font-black text-sky-600 tnum">${faNum(d.prob)}٪</span>
+                 <span class="text-xs text-gray-600 block">احتمال بارش برفی</span>`}
           </div>
           <div class="text-xs font-bold tnum">🎿${faNum(d.ski)} 🛡${faNum(d.safety)} ${d.verdictIcon}</div>
           <div class="text-xs opacity-80 tnum mt-1">فرصت برف: ${faNum(d.opp)}</div>
